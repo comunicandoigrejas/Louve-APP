@@ -23,7 +23,8 @@ def carregar_dados():
 
 def carregar_cultos_salvos():
     try:
-        return pd.read_csv(ARQUIVO_CULTOS)
+        df = pd.read_csv(ARQUIVO_CULTOS)
+        return df
     except:
         return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
@@ -42,10 +43,10 @@ if perfil == "Líder (Gestão)":
     if senha == SENHA_MESTRE:
         st.sidebar.success("Acesso Liberado")
         
-        # ABAS DO PAINEL DO LÍDER
-        tab_repertorio, tab_devocional = st.tabs(["🎸 Montar Repertório", "🌅 Devocional Diário"])
+        # NOVAS ABAS (Incluindo Histórico)
+        tab_repertorio, tab_devocional, tab_historico = st.tabs(["🎸 Montar Repertório", "🌅 Devocional", "📜 Histórico de Uso"])
         
-        # --- ABA 1: REPERTÓRIO ---
+        # --- ABA 1: REPERTÓRIO (Já existente) ---
         with tab_repertorio:
             col1, col2 = st.columns([2, 1])
             with col1:
@@ -83,31 +84,45 @@ if perfil == "Líder (Gestão)":
                         msg_l = f"🙌 *Grupo Shekiná - Repertório*\nCulto: *{nome_c}*\n🎶 *Lista:* {', '.join(lista_final)}"
                         st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg_l)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">📢 Enviar para Equipe</button></a>', unsafe_allow_html=True)
 
-        # --- ABA 2: DEVOCIONAL (NOVIDADE) ---
+        # --- ABA 2: DEVOCIONAL ---
         with tab_devocional:
             st.subheader("📖 Gerador de Devocional Shekiná")
-            tema_devocional = st.text_input("Digite o tema do dia (Ex: Fé, Humildade, Força):")
-            
-            if st.button("✨ Gerar Reflexão"):
-                if tema_devocional:
-                    # Aqui você pode personalizar os devocionais futuramente ou usar uma API
-                    # Por enquanto, criamos uma estrutura base editável
-                    st.session_state.devocional_pronto = f"🌅 *Devocional Diário - Grupo Shekiná*\n\n" \
-                        f"📍 *Tema:* {tema_devocional.capitalize()}\n\n" \
-                        f"📖 *Versículo:* \"Porque vivemos por fé, e não pelo que vemos.\" (2 Coríntios 5:7)\n\n" \
-                        f"🙏 *Reflexão:* Que hoje possamos focar não nas dificuldades que os nossos olhos veem, " \
-                        f"mas na promessa dAquele que nos chamou para servir. No louvor, a nossa fé se torna voz. " \
-                        f"Mantenha seu coração afinado com o céu!\n\n" \
-                        f"Deus abençoe seu dia!"
-                else:
-                    st.warning("Por favor, digite um tema.")
+            tema_dev = st.text_input("Tema do dia:")
+            if st.button("✨ Gerar Mensagem"):
+                st.session_state.dev_txt = f"🌅 *Devocional - Grupo Shekiná*\n\n*Tema:* {tema_dev}\n\n📖 \"Lâmpada para os meus pés é tua palavra...\" (Sl 119:105)\n\n🙏 Ministrar louvor é mais que música, é entrega!"
+            if 'dev_txt' in st.session_state:
+                txt = st.text_area("Editar:", st.session_state.dev_txt, height=150)
+                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px;">📲 Enviar Devocional</button></a>', unsafe_allow_html=True)
 
-            if 'devocional_pronto' in st.session_state:
-                st.text_area("Pré-visualização do Devocional:", st.session_state.devocional_pronto, height=200)
-                msg_d = st.session_state.devocional_pronto
-                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg_d)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">📲 Enviar Devocional no WhatsApp</button></a>', unsafe_allow_html=True)
+        # --- ABA 3: HISTÓRICO DE USO (NOVIDADE) ---
+        with tab_historico:
+            st.subheader("📜 Quando este louvor foi cantado?")
+            historico_db = carregar_cultos_salvos()
+            
+            musica_para_checar = st.selectbox("Selecione um louvor para ver o histórico:", [""] + sorted(df_musicas['Musica'].tolist()))
+            
+            if musica_para_checar:
+                # Filtrar os cultos onde a música aparece na string de músicas
+                cultos_onde_aparece = historico_db[historico_db['Musicas'].str.contains(musica_para_checar, na=False)]
+                
+                if not cultos_onde_aparece.empty:
+                    st.write(f"A música **'{musica_para_checar}'** foi cantada {len(cultos_onde_aparece)} vez(es):")
+                    # Formatar para exibição
+                    df_historico_view = cultos_onde_aparece[['Data_Culto', 'Nome_Culto']].copy()
+                    df_historico_view.columns = ['Data', 'Culto / Ocasião']
+                    st.table(df_historico_view)
+                else:
+                    st.warning("Este louvor ainda não foi registrado em nenhum culto salvo.")
 
 # 5. LÓGICA INTEGRANTES
 else:
-    st.header("📖 Painel do Integrante")
-    # ... (Lógica de visualização mantida conforme v4.0)
+    st.header("📖 Repertórios Publicados")
+    hist = carregar_cultos_salvos()
+    if not hist.empty:
+        opcoes = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
+        escolha = st.selectbox("Escolha o Culto:", opcoes)
+        if escolha:
+            dt, nm = escolha.split(" | ")
+            linha = hist[(hist['Data_Culto'] == dt) & (hist['Nome_Culto'] == nm)]
+            lista_n = linha['Musicas'].values[0].split(", ")
+            st.table(df_musicas[df_musicas['Musica'].isin(lista_n)][['Musica', 'Artista', 'Tom', 'Andamento']])
