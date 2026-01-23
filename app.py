@@ -1,104 +1,102 @@
 import streamlit as st
 import pandas as pd
+from datetime import date
 
 # Configuração da Página
-st.set_page_config(page_title="App de Louvor", page_icon="🎸", layout="wide")
+st.set_page_config(page_title="App Louvor - Gestão", page_icon="🎸", layout="wide")
 
-st.title("🎸 Gerenciador de Repertório - Louvor")
-
-# Inicializar a lista de seleção no estado da sessão (Session State)
-if 'setlist_selecionada' not in st.session_state:
-    st.session_state.setlist_selecionada = []
-
-# 1. CARREGANDO DADOS
+# 1. BANCO DE DADOS E ESTADO DA SESSÃO
 @st.cache_data
 def carregar_dados():
     try:
         df = pd.read_csv('louvores.csv')
         df['Tags'] = df['Tags'].fillna('').str.lower()
         return df
-    except Exception as e:
-        st.error(f"Erro ao carregar banco de dados: {e}")
+    except:
         return pd.DataFrame()
 
 df_musicas = carregar_dados()
 
-# Dicionário de tradução
-tradutor = {
-    "Varões": "varoes", "Mulheres": "mulheres", "Jovens": "jovens", "Culto de Louvor": "culto de louvor",
-    "Adoração": "adoracao", "Louvor": "louvor", "Congregacional": "congregacional",
-    "Missões": "missoes", "Apelo": "apelo", "Santidade": "santidade", 
-    "Santa Ceia": "santa ceia", "Agitados": "agitados"
-}
+# Inicializa o histórico de cultos salvos (Simulado - em produção usaríamos um CSV ou Sheets)
+if 'historico_cultos' not in st.session_state:
+    st.session_state.historico_cultos = {} # Ex: {"25/01/2026 - Noite": [Musicas]}
 
-st.markdown("---")
-st.subheader("🎛️ 1. Encontre e Selecione as Músicas")
-st.caption("Dica: Use os filtros abaixo e marque o check ao lado da música para adicioná-la ao culto.")
+if 'setlist_temp' not in st.session_state:
+    st.session_state.setlist_temp = []
 
-aba_culto, aba_estilo = st.tabs(["🏛️ Perfil do Culto", "🔥 Estilo / Clima"])
-filtro_selecionado = None
+# 2. BARRA LATERAL - CONTROLE DE ACESSO
+st.sidebar.title("🔐 Acesso")
+perfil = st.sidebar.radio("Selecione seu perfil:", ["Integrantes (Visualização)", "Líder (Gestão)"])
 
-with aba_culto:
-    culto = st.radio("Qual o perfil do culto?", ["Nenhum", "Varões", "Mulheres", "Jovens", "Culto de Louvor"], horizontal=True)
-    if culto != "Nenhum": filtro_selecionado = culto
-
-with aba_estilo:
-    estilo = st.radio("Qual o clima?", ["Nenhum", "Adoração", "Louvor", "Congregacional", "Missões", "Apelo", "Santidade", "Santa Ceia", "Agitados"], horizontal=True)
-    if estilo != "Nenhum": filtro_selecionado = estilo
-
-# LÓGICA DE FILTRAGEM E SELEÇÃO DIRETA
-if filtro_selecionado:
-    busca = tradutor[filtro_selecionado]
-    sugestoes = df_musicas[df_musicas['Tags'].str.contains(rf'\b{busca}\b', case=False, regex=True)].copy()
+# ---------------------------------------------------------
+# ABA DO LÍDER: CRIAÇÃO E SALVAMENTO
+# ---------------------------------------------------------
+if perfil == "Líder (Gestão)":
+    st.header("👨‍" + "💻 Painel do Líder")
     
-    if not sugestoes.empty:
-        # Criando a tabela interativa para seleção
-        event = st.dataframe(
-            sugestoes[['Musica', 'Artista', 'Tom', 'Andamento']],
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun", # Faz o app atualizar assim que clica
-            selection_mode="multi-row" # Permite selecionar várias
-        )
-
-        # Se houver linhas selecionadas na tabela, adicionamos ao Session State
-        selecionados_na_tabela = event.selection.rows
-        if selecionados_na_tabela:
-            novas_musicas = sugestoes.iloc[selecionados_na_tabela]['Musica'].tolist()
-            # Unir com o que já estava selecionado sem duplicar
-            for m in novas_musicas:
-                if m not in st.session_state.setlist_selecionada:
-                    st.session_state.setlist_selecionada.append(m)
-
-st.markdown("---")
-
-# 2. LISTA FINAL DO CULTO
-st.subheader("📝 2. Setlist Final do Culto")
-
-# O Multiselect agora é alimentado pelo clique na tabela, mas também permite busca manual
-setlist_final = st.multiselect(
-    "Músicas escolhidas (você pode remover ou adicionar aqui também):",
-    options=df_musicas['Musica'].tolist(),
-    default=st.session_state.setlist_selecionada
-)
-
-# Atualiza o estado caso o usuário remova algo no multiselect
-st.session_state.setlist_selecionada = setlist_final
-
-if setlist_final:
-    df_culto = df_musicas[df_musicas['Musica'].isin(setlist_final)]
-    st.table(df_culto[['Musica', 'Artista', 'Tom']])
+    col1, col2 = st.columns([2, 1])
     
-    # Botão para limpar tudo
-    if st.button("Limpar Lista"):
-        st.session_state.setlist_selecionada = []
-        st.rerun()
-
-    # Gerador de Texto para WhatsApp
-    texto_whatsapp = f"🎸 *REPERTÓRIO: {filtro_selecionado if filtro_selecionado else 'CULTO'}*\n\n"
-    for _, row in df_culto.iterrows():
-        texto_whatsapp += f"✅ *{row['Musica']}* ({row['Artista']}) - Tom: {row['Tom']}\n"
+    with col1:
+        st.subheader("1. Montar Repertório")
+        aba_culto, aba_estilo = st.tabs(["🏛️ Perfil", "🔥 Estilo"])
         
-    st.code(texto_whatsapp, language="markdown")
+        filtro = None
+        with aba_culto:
+            c = st.radio("Perfil:", ["Nenhum", "Varões", "Mulheres", "Jovens", "Louvor"], horizontal=True)
+            if c != "Nenhum": filtro = c
+        with aba_estilo:
+            e = st.radio("Estilo:", ["Nenhum", "Adoração", "Louvor", "Agitados", "Santa Ceia"], horizontal=True)
+            if e != "Nenhum": filtro = e
+
+        if filtro:
+            tag = filtro.lower().replace("õ", "o")
+            sugestoes = df_musicas[df_musicas['Tags'].str.contains(tag)].copy()
+            
+            sel = st.dataframe(sugestoes[['Musica', 'Artista', 'Tom']], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
+            
+            if sel.selection.rows:
+                novas = sugestoes.iloc[sel.selection.rows]['Musica'].tolist()
+                for m in novas:
+                    if m not in st.session_state.setlist_temp:
+                        st.session_state.setlist_temp.append(m)
+
+    with col2:
+        st.subheader("2. Salvar Culto")
+        nome_culto = st.text_input("Nome do Culto (Ex: Domingo Noite)")
+        data_culto = st.date_input("Data", date.today())
+        
+        lista_final = st.multiselect("Músicas na lista:", options=df_musicas['Musica'].tolist(), default=st.session_state.setlist_temp)
+        st.session_state.setlist_temp = lista_final
+
+        if st.button("💾 SALVAR REPERTÓRIO OFICIAL"):
+            if nome_culto and lista_final:
+                chave = f"{data_culto.strftime('%d/%m')} - {nome_culto}"
+                st.session_state.historico_cultos[chave] = lista_final
+                st.success(f"Culto '{chave}' salvo para a equipe!")
+                st.session_state.setlist_temp = [] # Limpa após salvar
+            else:
+                st.warning("Preencha o nome e escolha as músicas.")
+
+# ---------------------------------------------------------
+# ABA INTEGRANTES: APENAS VISUALIZAÇÃO
+# ---------------------------------------------------------
 else:
-    st.info("Sua lista está vazia. Selecione as músicas na tabela acima.")
+    st.header("📖 Repertório Oficial")
+    
+    if not st.session_state.historico_cultos:
+        st.info("O líder ainda não liberou o repertório para os próximos cultos.")
+    else:
+        culto_escolhido = st.selectbox("Selecione o culto para ver as músicas:", list(st.session_state.historico_cultos.keys()))
+        
+        if culto_escolhido:
+            musicas_nomes = st.session_state.historico_cultos[culto_escolhido]
+            df_exibir = df_musicas[df_musicas['Musica'].isin(musicas_nomes)]
+            
+            st.markdown(f"### 📋 Lista para: {culto_escolhido}")
+            st.table(df_exibir[['Musica', 'Artista', 'Tom', 'Andamento']])
+            
+            # Botão para o integrante copiar a lista
+            texto = f"🎸 *LOUVOR: {culto_escolhido}*\n\n"
+            for _, r in df_exibir.iterrows():
+                texto += f"🔹 {r['Musica']} ({r['Tom']})\n"
+            st.code(texto)
