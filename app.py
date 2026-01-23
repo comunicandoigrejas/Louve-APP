@@ -94,25 +94,32 @@ if perfil == "Líder (Gestão)":
                 txt = st.text_area("Editar:", st.session_state.dev_txt, height=150)
                 st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px;">📲 Enviar Devocional</button></a>', unsafe_allow_html=True)
 
-        # --- ABA 3: HISTÓRICO DE USO (NOVIDADE) ---
+        # --- ABA 3: HISTÓRICO DE CULTOS (Visualização por Data) ---
         with tab_historico:
-            st.subheader("📜 Quando este louvor foi cantado?")
+            st.subheader("📜 Registro Geral de Cultos")
             historico_db = carregar_cultos_salvos()
             
-            musica_para_checar = st.selectbox("Selecione um louvor para ver o histórico:", [""] + sorted(df_musicas['Musica'].tolist()))
-            
-            if musica_para_checar:
-                # Filtrar os cultos onde a música aparece na string de músicas
-                cultos_onde_aparece = historico_db[historico_db['Musicas'].str.contains(musica_para_checar, na=False)]
+            if historico_db.empty:
+                st.info("Nenhum culto registrado no histórico ainda.")
+            else:
+                # Ordenar para que o mais recente apareça no topo
+                historico_ordenado = historico_db.sort_values(by="Data_Culto", ascending=False)
                 
-                if not cultos_onde_aparece.empty:
-                    st.write(f"A música **'{musica_para_checar}'** foi cantada {len(cultos_onde_aparece)} vez(es):")
-                    # Formatar para exibição
-                    df_historico_view = cultos_onde_aparece[['Data_Culto', 'Nome_Culto']].copy()
-                    df_historico_view.columns = ['Data', 'Culto / Ocasião']
-                    st.table(df_historico_view)
-                else:
-                    st.warning("Este louvor ainda não foi registrado em nenhum culto salvo.")
+                for index, row in historico_ordenado.iterrows():
+                    # Criar um "Card" para cada culto
+                    with st.expander(f"📅 {row['Data_Culto']} - {row['Nome_Culto']}"):
+                        st.markdown(f"**Data:** {row['Data_Culto']}")
+                        st.markdown(f"**Tipo de Culto:** {row['Nome_Culto']}")
+                        st.markdown("**Louvores Cantados:**")
+                        
+                        # Transforma a string de músicas em uma lista para exibir em tópicos
+                        lista_musicas = row['Musicas'].split(", ")
+                        for musica in lista_musicas:
+                            st.write(f"🎶 {musica}")
+                        
+                        # Botão extra caso queira copiar esse histórico antigo
+                        msg_retro = f"🕒 *Histórico Grupo Shekiná*\n*Culto:* {row['Nome_Culto']}\n*Data:* {row['Data_Culto']}\n*Músicas:* {row['Musicas']}"
+                        st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg_retro)}" target="_blank"><button style="background-color: #f0f2f6; color: black; border: 1px solid #d1d1d1; padding: 5px 10px; border-radius: 5px; font-size: 12px;">Repostar no WhatsApp</button></a>', unsafe_allow_html=True)
 
 # 5. LÓGICA INTEGRANTES
 else:
