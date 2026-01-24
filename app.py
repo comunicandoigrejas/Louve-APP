@@ -17,7 +17,7 @@ if not st.session_state.autenticado_geral:
     # Substitua 'igreja2026' pela senha que você quer dar para TODOS os músicos
     senha_entrada = st.text_input("Digite a senha de acesso da equipe:", type="password")
     if st.button("Entrar no Sistema"):
-        if senha_entrada == "igreja2026": # SENHA GERAL DE ENTRADA
+        if senha_entrada == "isosed2026": # SENHA GERAL DE ENTRADA
             st.session_state.autenticado_geral = True
             st.rerun()
         else:
