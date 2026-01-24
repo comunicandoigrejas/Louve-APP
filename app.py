@@ -7,14 +7,19 @@ import os
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná - Gestão", page_icon="🎸", layout="wide")
 
-# 2. OCULTAR ELEMENTOS DO STREAMLIT (VISUAL LIMPO E PROFISSIONAL)
+# 2. OCULTAR TODOS OS ELEMENTOS DO STREAMLIT (REFORÇADO)
 hide_st_style = """
             <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stAppDeployButton {display:none;}
-            [data-testid="stStatusWidget"] {display:none;}
+            #MainMenu {visibility: hidden !important;}
+            footer {visibility: hidden !important;}
+            header {visibility: hidden !important;}
+            .stAppDeployButton {display:none !important;}
+            [data-testid="stStatusWidget"] {display:none !important;}
+            [data-testid="stHeader"] {display:none !important;}
+            #stDecoration {display:none !important;}
+            button[title="View source"] {display:none !important;}
+            /* Esconde o botão de ajuda flutuante */
+            .st-emotion-cache-164784p {display: none !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -45,12 +50,12 @@ def carregar_cultos_salvos():
 # 3. INTERFACE E MENU LATERAL
 st.sidebar.title("🛡️ Grupo Shekiná")
 
-# BOTÃO DO INSTAGRAM
-link_instagram = "https://www.instagram.com/seu_perfil" # Troque pelo seu link real
+# --- SEU INSTAGRAM PERSONALIZADO ---
+link_instagram = "https://www.instagram.com/comunicandoigrejas/"
 st.sidebar.markdown(f'''
     <a href="{link_instagram}" target="_blank">
-        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px;">
-            📸 Siga nosso Instagram
+        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 20px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+            📸 Siga @comunicandoigrejas
         </button>
     </a>
     ''', unsafe_allow_html=True)
@@ -93,11 +98,11 @@ if perfil == "Líder (Gestão)":
                         if m not in st.session_state.carrinho: st.session_state.carrinho.append(m)
 
             with col2:
-                st.subheader("2. Salvar Setlist")
-                nome_c = st.text_input("Nome do Culto:", key="input_nome_culto")
+                st.subheader("2. Salvar e Notificar")
+                nome_c = st.text_input("Nome do Culto:", key="nome_final_input")
                 data_c = st.date_input("Data:", date.today())
                 
-                # PROTEÇÃO CONTRA O ERRO DA IMAGEM
+                # TRAVA DE SEGURANÇA PARA O ERRO DA IMAGEM
                 carrinho_validado = [m for m in st.session_state.carrinho if m in lista_opcoes_oficial]
                 
                 final_list = st.multiselect("Músicas na Setlist:", options=lista_opcoes_oficial, default=carrinho_validado)
@@ -106,10 +111,9 @@ if perfil == "Líder (Gestão)":
                 if st.button("💾 PUBLICAR REPERTÓRIO"):
                     if nome_c and final_list:
                         novo_reg = pd.DataFrame([[str(data_c), nome_c, ", ".join(final_list)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
-                        hist_db = carregar_cultos_salvos()
-                        pd.concat([hist_db, novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
+                        pd.concat([carregar_cultos_salvos(), novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
                         st.success("✅ Salvo com sucesso!")
-                        msg_wa = f"🙌 *Grupo Shekiná - Novo Louvor!*\n\nCulto: *{nome_c}*\n🎶 *Lista:* {', '.join(final_list)}"
+                        msg_wa = f"🙌 *Grupo Shekiná*\nCulto: *{nome_c}*\n🎶 *Lista:* {', '.join(final_list)}"
                         st.session_state.link_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
                     else:
                         st.error("Preencha o nome e as músicas.")
@@ -119,7 +123,7 @@ if perfil == "Líder (Gestão)":
 
         with tab_cadastro:
             st.subheader("📝 Cadastrar Nova Música")
-            with st.form("form_cad", clear_on_submit=True):
+            with st.form("form_cad_shekina", clear_on_submit=True):
                 n_m = st.text_input("Nome:")
                 n_a = st.text_input("Artista:")
                 n_t = st.text_input("Tom:")
@@ -128,22 +132,12 @@ if perfil == "Líder (Gestão)":
                     if n_m and n_a:
                         t_str = " ".join([t.lower().replace("õ", "o") for t in n_tags])
                         nova_mus = pd.DataFrame([[n_m, n_a, n_t, "Medio", t_str]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
-                        df_atual = carregar_dados()
-                        pd.concat([df_atual.drop(columns=['Musica_Busca']), nova_mus], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
+                        pd.concat([carregar_dados().drop(columns=['Musica_Busca']), nova_mus], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
                         st.success(f"'{n_m}' adicionado!")
                         st.rerun()
 
-        with tab_devocional:
-            st.subheader("📖 Devocional")
-            t_d = st.text_input("Tema:")
-            if st.button("Gerar Mensagem"):
-                st.session_state.dev_text = f"🌅 *Devocional Shekiná*\n*Tema:* {t_d}\n\nDeus é fiel!"
-            if 'dev_text' in st.session_state:
-                txt = st.text_area("Edite:", st.session_state.dev_text)
-                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">📲 Enviar WhatsApp</button></a>', unsafe_allow_html=True)
-
         with tab_historico:
-            st.subheader("📜 Histórico de Cultos")
+            st.subheader("📜 Histórico")
             h = carregar_cultos_salvos()
             if not h.empty:
                 for i, r in h.sort_values(by="Data_Culto", ascending=False).iterrows():
@@ -160,11 +154,11 @@ else:
         opc = (h_int['Data_Culto'].astype(str) + " | " + h_int['Nome_Culto']).tolist()[::-1]
         esc = st.selectbox("Selecione o Culto:", opc)
         if esc:
-            d_s, n_s = esc.split(" | ")
             try:
+                d_s, n_s = esc.split(" | ")
                 reg = h_int[(h_int['Data_Culto'].astype(str) == d_s) & (h_int['Nome_Culto'] == n_s)].iloc[0]
                 m_l = reg['Musicas'].split(", ")
                 df_v = carregar_dados()
                 st.table(df_v[df_v['Musica'].isin(m_l)][['Musica', 'Artista', 'Tom']])
             except:
-                st.error("Erro ao carregar este registro.")
+                st.error("Selecione um culto válido.")
