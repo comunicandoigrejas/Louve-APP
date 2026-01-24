@@ -12,19 +12,27 @@ SENHA_MESTRE = "shekina123"
 ARQUIVO_LOUVORES = "louvores.csv"
 ARQUIVO_CULTOS = "cultos_salvos.csv"
 
-# 1. FUNÇÕES DE DADOS (Com limpeza de Cache para garantir visualização)
+# 1. FUNÇÕES DE DADOS (Com verificação de integridade)
 def carregar_dados():
+    if not os.path.exists(ARQUIVO_LOUVORES):
+        # Cria um arquivo básico se não existir para evitar erros
+        df_init = pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
+        df_init.to_csv(ARQUIVO_LOUVORES, index=False)
+        return df_init
     try:
         df = pd.read_csv(ARQUIVO_LOUVORES)
-        df['Musica_Busca'] = df['Musica'].fillna('').str.lower().str.strip()
-        df['Tags'] = df['Tags'].fillna('').str.lower().str.strip()
+        df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
+        df['Tags'] = df['Tags'].fillna('').astype(str).str.lower().str.strip()
         return df
     except:
         return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
 
 def carregar_cultos_salvos():
     if os.path.exists(ARQUIVO_CULTOS):
-        return pd.read_csv(ARQUIVO_CULTOS)
+        try:
+            return pd.read_csv(ARQUIVO_CULTOS)
+        except:
+            pass
     return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
 # 2. INTERFACE
@@ -45,6 +53,7 @@ if perfil == "Líder (Gestão)":
         ])
         
         df_musicas = carregar_dados()
+        lista_opcoes_oficial = df_musicas['Musica'].tolist()
 
         with tab_repertorio:
             col1, col2 = st.columns([2, 1])
@@ -60,55 +69,69 @@ if perfil == "Líder (Gestão)":
                 if busca_n:
                     df_f = df_f[df_f['Musica_Busca'].str.contains(busca_n)]
 
+                # Seleção na tabela
                 sel = st.dataframe(df_f[['Musica', 'Artista', 'Tom']], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
                 
-                if 'carrinho' not in st.session_state: st.session_state.carrinho = []
+                if 'carrinho' not in st.session_state: 
+                    st.session_state.carrinho = []
+                
                 if sel.selection.rows:
                     itens = df_f.iloc[sel.selection.rows]['Musica'].tolist()
                     for i in itens:
-                        if i not in st.session_state.carrinho: st.session_state.carrinho.append(i)
+                        if i not in st.session_state.carrinho:
+                            st.session_state.carrinho.append(i)
 
             with col2:
                 st.subheader("2. Salvar e Notificar")
-                nome_c = st.text_input("Nome do Culto:", key="nome_culto_input")
+                nome_c = st.text_input("Nome do Culto:", key="nome_c_input")
                 data_c = st.date_input("Data:", date.today())
                 
-                final_list = st.multiselect("Setlist:", options=df_musicas['Musica'].tolist(), default=st.session_state.carrinho)
+                # --- CORREÇÃO DO ERRO DA IMAGEM ---
+                # Garante que as músicas no carrinho realmente existem na lista oficial
+                carrinho_validado = [m for m in st.session_state.carrinho if m in lista_opcoes_oficial]
+                
+                final_list = st.multiselect(
+                    "Setlist Final:", 
+                    options=lista_opcoes_oficial, 
+                    default=carrinho_validado
+                )
                 st.session_state.carrinho = final_list
 
                 if st.button("💾 PUBLICAR PARA A EQUIPE"):
                     if nome_c and final_list:
                         novo_culto = pd.DataFrame([[str(data_c), nome_c, ", ".join(final_list)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
                         hist = carregar_cultos_salvos()
-                        pd.concat([hist, novo_culto]).to_csv(ARQUIVO_CULTOS, index=False)
-                        st.success("✅ Salvo com Sucesso!")
+                        pd.concat([hist, novo_culto], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
                         
-                        # Preparar Mensagem WhatsApp
+                        # Link WhatsApp
                         msg = f"🙌 *Grupo Shekiná - Novo Louvor!*\n\nCulto: *{nome_c}*\nData: {data_c.strftime('%d/%m')}\n\n🎶 *Lista:* {', '.join(final_list)}"
-                        st.session_state.link_whatsapp = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+                        st.session_state.link_wa = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+                        st.success("✅ Repertório Gravado!")
                     else:
                         st.error("Preencha o nome e as músicas!")
 
-                # Botão WhatsApp aparece aqui se o link existir
-                if 'link_whatsapp' in st.session_state:
-                    st.markdown(f'<a href="{st.session_state.link_whatsapp}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">📢 ENVIAR NO WHATSAPP</button></a>', unsafe_allow_html=True)
+                if 'link_wa' in st.session_state:
+                    st.markdown(f'<a href="{st.session_state.link_wa}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">📢 ENVIAR NO WHATSAPP</button></a>', unsafe_allow_html=True)
 
         with tab_cadastro:
             st.subheader("📝 Cadastrar Novo Louvor")
-            with st.form("add_music"):
+            with st.form("form_add", clear_on_submit=True):
                 n_m = st.text_input("Música:")
                 n_a = st.text_input("Artista:")
                 n_t = st.text_input("Tom:")
-                n_tags = st.multiselect("Tags:", ["Adoração", "Louvor", "Varões", "Mulheres", "Jovens", "Santa Ceia", "Agitados"])
-                if st.form_submit_button("Adicionar"):
-                    t_str = " ".join([t.lower().replace("õ", "o") for t in n_tags])
-                    nova_r = pd.DataFrame([[n_m, n_a, n_t, "Medio", t_str]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
-                    pd.concat([carregar_dados().drop(columns=['Musica_Busca']), nova_r]).to_csv(ARQUIVO_LOUVORES, index=False)
-                    st.success("Adicionado!")
-                    st.rerun()
+                n_tags = st.multiselect("Tags:", ["Adoração", "Louvor", "Varões", "Mulheres", "Jovens", "Santa Ceia", "Agitados", "Missões", "Apelo", "Santidade", "Congregacional"])
+                if st.form_submit_button("✅ Adicionar ao Banco"):
+                    if n_m and n_a:
+                        t_str = " ".join([t.lower().replace("õ", "o") for t in n_tags])
+                        nova_r = pd.DataFrame([[n_m, n_a, n_t, "Medio", t_str]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
+                        # Recarrega para evitar perder o que já tem
+                        df_atual = pd.read_csv(ARQUIVO_LOUVORES)
+                        pd.concat([df_atual, nova_r], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
+                        st.success(f"'{n_m}' adicionado!")
+                        st.rerun()
 
         with tab_historico:
-            st.subheader("📜 Histórico")
+            st.subheader("📜 Histórico de Cultos")
             h = carregar_cultos_salvos()
             if not h.empty:
                 st.dataframe(h.sort_values(by="Data_Culto", ascending=False), use_container_width=True, hide_index=True)
@@ -119,21 +142,16 @@ else:
     h = carregar_cultos_salvos()
     
     if h.empty:
-        st.info("Nenhum culto publicado.")
+        st.info("Nenhum culto publicado ainda.")
     else:
-        # Criar a lista de opções para o selectbox
         opcoes = (h['Data_Culto'].astype(str) + " | " + h['Nome_Culto']).tolist()[::-1]
         escolha = st.selectbox("Selecione o Culto:", opcoes)
         
         if escolha:
             dt_s, nm_s = escolha.split(" | ")
-            # Filtragem exata
             linha = h[(h['Data_Culto'].astype(str) == dt_s) & (h['Nome_Culto'] == nm_s)].iloc[0]
             m_nomes = linha['Musicas'].split(", ")
             
-            # Carrega dados das músicas para pegar os tons
             df_m = carregar_dados()
             df_v = df_m[df_m['Musica'].isin(m_nomes)]
-            
-            st.markdown(f"### 📋 Lista: {nm_s}")
             st.table(df_v[['Musica', 'Artista', 'Tom']])
