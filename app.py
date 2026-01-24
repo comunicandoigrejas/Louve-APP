@@ -5,24 +5,7 @@ import pandas as pd
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# 2. CONEXÃO COM GOOGLE SHEETS (CORRIGIDA)
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    
-    # ATENÇÃO: Mudamos para "Louvores" para evitar o erro do 'á'
-    df_m = conn.read(worksheet="Louvores", ttl="1m")
-    
-    # Criar coluna de busca na memória (para evitar o KeyError anterior)
-    if not df_m.empty:
-        df_m['Musica_Busca'] = df_m['Musica'].fillna('').astype(str).str.lower().str.strip()
-        
-    st.sidebar.success("✅ Conectado à Nuvem!")
-except Exception as e:
-    st.error("❌ Erro de Codificação ou Conexão!")
-    st.write("Dica: Renomeie a aba da sua planilha para 'Louvores' (sem acento).")
-    st.stop()
-
-# 3. CSS DE LIMPEZA (OPCIONAL NESTA FASE DE TESTE)
+# 2. CSS DE LIMPEZA (Sutil para não esconder erros)
 st.markdown("""
     <style>
     [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
@@ -30,7 +13,24 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 4. SIDEBAR E ASSINATURA
+# 3. TENTATIVA DE CONEXÃO REFORÇADA
+try:
+    # Criando a conexão
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    
+    # Tentando ler a aba "Louvores"
+    # Adicionamos o parâmental 'ttl=0' para garantir que ele pegue os dados MAIS RECENTES agora
+    df_m = conn.read(worksheet="Louvores", ttl=0)
+    
+    st.sidebar.success("✅ Conectado ao Google Sheets!")
+except Exception as e:
+    st.error("❌ Erro Crítico de Conexão")
+    st.warning("Verifique se o nome da aba é 'Louvores' e se o link nos Secrets está correto.")
+    # Mostra o erro técnico real para diagnóstico
+    st.exception(e) 
+    st.stop()
+
+# 4. SIDEBAR E BRANDING
 st.sidebar.markdown("# 🛡️ Grupo Shekiná")
 st.sidebar.markdown(f'''
     <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
@@ -44,17 +44,30 @@ st.sidebar.markdown(f'''
 if 'auth' not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
-    st.title("🔑 Acesso ao Sistema")
-    senha = st.text_input("Senha:", type="password")
-    if st.button("Entrar"):
+    st.title("🔑 Acesso Restrito")
+    senha = st.text_input("Digite a Senha da Equipe:", type="password")
+    if st.button("Entrar no Sistema"):
         if senha in ["igreja2026", "shekina123"]:
             st.session_state.auth = True
             st.rerun()
     st.stop()
 
-# 6. EXIBIÇÃO DE TESTE
-st.subheader("🎵 Catálogo de Louvores (Google Sheets)")
-if df_m.empty:
-    st.warning("A planilha está conectada, mas parece vazia.")
+# 6. CONTEÚDO PRINCIPAL (Exibição dos Louvores da Planilha)
+st.subheader("🎵 Catálogo Atualizado (Nuvem)")
+
+if df_m is not None and not df_m.empty:
+    # Cria coluna de busca na memória
+    df_m['Busca'] = df_m['Musica'].fillna('').astype(str).str.lower()
+    
+    busca = st.text_input("Pesquisar louvor no catálogo:").lower()
+    
+    if busca:
+        df_filtrado = df_m[df_m['Busca'].str.contains(busca)]
+    else:
+        df_filtrado = df_m
+
+    # Exibe a tabela sem a coluna de busca técnica
+    colunas_visiveis = [c for c in df_filtrado.columns if c != 'Busca']
+    st.dataframe(df_filtrado[colunas_visiveis], use_container_width=True, hide_index=True)
 else:
-    st.dataframe(df_m[['Musica', 'Artista', 'Tom', 'Andamento', 'Categoria']], use_container_width=True, hide_index=True)
+    st.info("A planilha está conectada, mas não encontramos dados. Adicione louvores no Google Sheets!")
