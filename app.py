@@ -55,7 +55,7 @@ link_instagram = "https://www.instagram.com/comunicandoigrejas/"
 st.sidebar.markdown(f'''
     <a href="{link_instagram}" target="_blank">
         <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 20px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
-            📸 Siga @comunicandoigrejas
+            📸 By Comunicando Igrejas
         </button>
     </a>
     ''', unsafe_allow_html=True)
