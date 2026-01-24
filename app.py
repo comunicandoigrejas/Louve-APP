@@ -7,18 +7,21 @@ import os
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná - Gestão", page_icon="🎸", layout="wide")
 
-# 2. OCULTAR TODOS OS ELEMENTOS DO STREAMLIT (REFORÇADO)
+# 2. LIMPEZA TOTAL DA INTERFACE (REMOVE CABEÇALHO, RODAPÉ E TODOS OS BOTÕES DO STREAMLIT)
+#
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden !important;}
             footer {visibility: hidden !important;}
             header {visibility: hidden !important;}
-            .stAppDeployButton {display:none !important;}
-            [data-testid="stStatusWidget"] {display:none !important;}
-            [data-testid="stHeader"] {display:none !important;}
-            #stDecoration {display:none !important;}
-            button[title="View source"] {display:none !important;}
-            /* Esconde o botão de ajuda flutuante */
+            [data-testid="stHeader"] {display: none !important;}
+            [data-testid="stToolbar"] {display: none !important;}
+            [data-testid="stStatusWidget"] {display: none !important;}
+            .stAppDeployButton {display: none !important;}
+            button[title="View source"] {display: none !important;}
+            #stDecoration {display: none !important;}
+            /* Esconde o menu de perfil e ajuda flutuante */
+            div[data-testid="stStatusWidget"] {display: none !important;}
             .st-emotion-cache-164784p {display: none !important;}
             </style>
             """
@@ -29,7 +32,7 @@ SENHA_MESTRE = "shekina123"
 ARQUIVO_LOUVORES = "louvores.csv"
 ARQUIVO_CULTOS = "cultos_salvos.csv"
 
-# --- FUNÇÕES DE CARREGAMENTO ---
+# --- FUNÇÕES DE CARREGAMENTO (IMPORTANTE: pandas agora correto) ---
 def carregar_dados():
     if not os.path.exists(ARQUIVO_LOUVORES):
         pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"]).to_csv(ARQUIVO_LOUVORES, index=False)
@@ -47,14 +50,14 @@ def carregar_cultos_salvos():
         except: pass
     return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
-# 3. INTERFACE E MENU LATERAL
+# 3. MENU LATERAL E INSTAGRAM
 st.sidebar.title("🛡️ Grupo Shekiná")
 
-# --- SEU INSTAGRAM PERSONALIZADO ---
+# --- SEU LINK DO INSTAGRAM ---
 link_instagram = "https://www.instagram.com/comunicandoigrejas/"
 st.sidebar.markdown(f'''
     <a href="{link_instagram}" target="_blank">
-        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 20px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 25px;">
             📸 By Comunicando Igrejas
         </button>
     </a>
@@ -98,11 +101,11 @@ if perfil == "Líder (Gestão)":
                         if m not in st.session_state.carrinho: st.session_state.carrinho.append(m)
 
             with col2:
-                st.subheader("2. Salvar e Notificar")
-                nome_c = st.text_input("Nome do Culto:", key="nome_final_input")
+                st.subheader("2. Salvar Setlist")
+                nome_c = st.text_input("Nome do Culto:", key="id_nome_culto")
                 data_c = st.date_input("Data:", date.today())
                 
-                # TRAVA DE SEGURANÇA PARA O ERRO DA IMAGEM
+                # --- SOLUÇÃO PARA O ERRO DA IMAGEM ---
                 carrinho_validado = [m for m in st.session_state.carrinho if m in lista_opcoes_oficial]
                 
                 final_list = st.multiselect("Músicas na Setlist:", options=lista_opcoes_oficial, default=carrinho_validado)
@@ -123,7 +126,7 @@ if perfil == "Líder (Gestão)":
 
         with tab_cadastro:
             st.subheader("📝 Cadastrar Nova Música")
-            with st.form("form_cad_shekina", clear_on_submit=True):
+            with st.form("form_cad_final", clear_on_submit=True):
                 n_m = st.text_input("Nome:")
                 n_a = st.text_input("Artista:")
                 n_t = st.text_input("Tom:")
