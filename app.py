@@ -4,25 +4,32 @@ from datetime import date
 import urllib.parse
 import os
 
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA (Sempre o primeiro comando)
 st.set_page_config(page_title="Grupo Shekiná - Gestão", page_icon="🎸", layout="wide")
 
-# 2. LIMPEZA TOTAL DA INTERFACE (REMOVE CABEÇALHO, RODAPÉ E TODOS OS BOTÕES DO STREAMLIT)
-#
+# 2. LIMPEZA "FORÇA BRUTA" (ESCONDE HEADER, FOOTER, MENU E O SELO DO STREAMLIT CLOUD)
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden !important;}
             footer {visibility: hidden !important;}
             header {visibility: hidden !important;}
             [data-testid="stHeader"] {display: none !important;}
-            [data-testid="stToolbar"] {display: none !important;}
+            .stAppDeployButton {display:none !important;}
+            #stDecoration {display:none !important;}
+            
+            /* REMOVE O BOTÃO FLUTUANTE DO STREAMLIT CLOUD (O "VIEWER BADGE") */
+            div.viewerBadge_container__1QSob {display: none !important;}
+            .viewerBadge_container__1QSob {display: none !important;}
             [data-testid="stStatusWidget"] {display: none !important;}
-            .stAppDeployButton {display: none !important;}
-            button[title="View source"] {display: none !important;}
-            #stDecoration {display: none !important;}
-            /* Esconde o menu de perfil e ajuda flutuante */
-            div[data-testid="stStatusWidget"] {display: none !important;}
+            
+            /* REMOVE O ÍCONE DE INTERROGAÇÃO E AJUDA */
+            button[title="View source"] {display:none !important;}
             .st-emotion-cache-164784p {display: none !important;}
+            
+            /* AJUSTE DE MARGEM PARA COMPENSAR A SAÍDA DO HEADER */
+            .stApp {
+                margin-top: -70px;
+            }
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -32,7 +39,7 @@ SENHA_MESTRE = "shekina123"
 ARQUIVO_LOUVORES = "louvores.csv"
 ARQUIVO_CULTOS = "cultos_salvos.csv"
 
-# --- FUNÇÕES DE CARREGAMENTO (IMPORTANTE: pandas agora correto) ---
+# --- FUNÇÕES DE CARREGAMENTO (IMPORT PANDAS CORRETO) ---
 def carregar_dados():
     if not os.path.exists(ARQUIVO_LOUVORES):
         pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"]).to_csv(ARQUIVO_LOUVORES, index=False)
@@ -50,15 +57,15 @@ def carregar_cultos_salvos():
         except: pass
     return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
-# 3. MENU LATERAL E INSTAGRAM
+# 3. MENU LATERAL E SEU INSTAGRAM
 st.sidebar.title("🛡️ Grupo Shekiná")
 
-# --- SEU LINK DO INSTAGRAM ---
+# SEU INSTAGRAM: @comunicandoigrejas
 link_instagram = "https://www.instagram.com/comunicandoigrejas/"
 st.sidebar.markdown(f'''
     <a href="{link_instagram}" target="_blank">
-        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 25px;">
-            📸 By Comunicando Igrejas
+        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 25px; box-shadow: 0px 4px 12px rgba(225, 48, 108, 0.4);">
+            🔧 By Comunicando Igrejas
         </button>
     </a>
     ''', unsafe_allow_html=True)
@@ -102,19 +109,20 @@ if perfil == "Líder (Gestão)":
 
             with col2:
                 st.subheader("2. Salvar Setlist")
-                nome_c = st.text_input("Nome do Culto:", key="id_nome_culto")
+                nome_c = st.text_input("Nome do Culto:", key="key_save_nome")
                 data_c = st.date_input("Data:", date.today())
                 
-                # --- SOLUÇÃO PARA O ERRO DA IMAGEM ---
+                # Validação para evitar erro de Multiselect
                 carrinho_validado = [m for m in st.session_state.carrinho if m in lista_opcoes_oficial]
                 
-                final_list = st.multiselect("Músicas na Setlist:", options=lista_opcoes_oficial, default=carrinho_validado)
+                final_list = st.multiselect("Setlist Final:", options=lista_opcoes_oficial, default=carrinho_validado)
                 st.session_state.carrinho = final_list
 
                 if st.button("💾 PUBLICAR REPERTÓRIO"):
                     if nome_c and final_list:
                         novo_reg = pd.DataFrame([[str(data_c), nome_c, ", ".join(final_list)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
-                        pd.concat([carregar_cultos_salvos(), novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
+                        hist_db = carregar_cultos_salvos()
+                        pd.concat([hist_db, novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
                         st.success("✅ Salvo com sucesso!")
                         msg_wa = f"🙌 *Grupo Shekiná*\nCulto: *{nome_c}*\n🎶 *Lista:* {', '.join(final_list)}"
                         st.session_state.link_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
@@ -125,22 +133,22 @@ if perfil == "Líder (Gestão)":
                     st.markdown(f'<a href="{st.session_state.link_wa}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">📢 ENVIAR NO WHATSAPP</button></a>', unsafe_allow_html=True)
 
         with tab_cadastro:
-            st.subheader("📝 Cadastrar Nova Música")
-            with st.form("form_cad_final", clear_on_submit=True):
-                n_m = st.text_input("Nome:")
-                n_a = st.text_input("Artista:")
-                n_t = st.text_input("Tom:")
-                n_tags = st.multiselect("Tags:", ["Adoração", "Louvor", "Varões", "Mulheres", "Jovens", "Santa Ceia", "Missões", "Apelo", "Santidade"])
+            st.subheader("➕ Novo Louvor")
+            with st.form("form_novo", clear_on_submit=True):
+                nm = st.text_input("Nome:")
+                ar = st.text_input("Artista:")
+                tm = st.text_input("Tom:")
+                tg = st.multiselect("Tags:", ["Adoração", "Louvor", "Varões", "Mulheres", "Jovens", "Santa Ceia", "Missões", "Apelo", "Santidade"])
                 if st.form_submit_button("✅ Adicionar"):
-                    if n_m and n_a:
-                        t_str = " ".join([t.lower().replace("õ", "o") for t in n_tags])
-                        nova_mus = pd.DataFrame([[n_m, n_a, n_t, "Medio", t_str]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
-                        pd.concat([carregar_dados().drop(columns=['Musica_Busca']), nova_mus], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
-                        st.success(f"'{n_m}' adicionado!")
+                    if nm and ar:
+                        t_s = " ".join([t.lower().replace("õ", "o") for t in tg])
+                        nova = pd.DataFrame([[nm, ar, tm, "Medio", t_s]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
+                        pd.concat([carregar_dados().drop(columns=['Musica_Busca']), nova], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
+                        st.success(f"'{nm}' adicionado!")
                         st.rerun()
 
         with tab_historico:
-            st.subheader("📜 Histórico")
+            st.subheader("📜 Histórico de Cultos")
             h = carregar_cultos_salvos()
             if not h.empty:
                 for i, r in h.sort_values(by="Data_Culto", ascending=False).iterrows():
