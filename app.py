@@ -1,5 +1,5 @@
 import streamlit as st
-import pd as pd
+import pandas as pd
 from datetime import date
 import urllib.parse
 import os
@@ -7,17 +7,14 @@ import os
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná - Gestão", page_icon="🎸", layout="wide")
 
-# 2. OCULTAR ELEMENTOS DO STREAMLIT E REMOVER ÍCONE FLUTUANTE
-# O código abaixo remove o header, o footer e o botão de ajuda (ajuda flutuante)
+# 2. OCULTAR ELEMENTOS DO STREAMLIT (VISUAL LIMPO E PROFISSIONAL)
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
             .stAppDeployButton {display:none;}
-            /* Remove o botão flutuante de ajuda no canto inferior */
             [data-testid="stStatusWidget"] {display:none;}
-            button[title="View source"] {display:none;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -48,9 +45,8 @@ def carregar_cultos_salvos():
 # 3. INTERFACE E MENU LATERAL
 st.sidebar.title("🛡️ Grupo Shekiná")
 
-# --- BOTÃO DO INSTAGRAM NO MENU LATERAL ---
-# Substitua 'seu_usuario' pelo seu nome de usuário real do Instagram
-link_instagram = "https://www.instagram.com/seu_usuario"
+# BOTÃO DO INSTAGRAM
+link_instagram = "https://www.instagram.com/seu_perfil" # Troque pelo seu link real
 st.sidebar.markdown(f'''
     <a href="{link_instagram}" target="_blank">
         <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px;">
@@ -98,10 +94,10 @@ if perfil == "Líder (Gestão)":
 
             with col2:
                 st.subheader("2. Salvar Setlist")
-                nome_c = st.text_input("Nome do Culto:")
+                nome_c = st.text_input("Nome do Culto:", key="input_nome_culto")
                 data_c = st.date_input("Data:", date.today())
                 
-                # Validação para evitar o erro de API (StreamlitAPIException)
+                # PROTEÇÃO CONTRA O ERRO DA IMAGEM
                 carrinho_validado = [m for m in st.session_state.carrinho if m in lista_opcoes_oficial]
                 
                 final_list = st.multiselect("Músicas na Setlist:", options=lista_opcoes_oficial, default=carrinho_validado)
@@ -110,7 +106,8 @@ if perfil == "Líder (Gestão)":
                 if st.button("💾 PUBLICAR REPERTÓRIO"):
                     if nome_c and final_list:
                         novo_reg = pd.DataFrame([[str(data_c), nome_c, ", ".join(final_list)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
-                        pd.concat([carregar_cultos_salvos(), novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
+                        hist_db = carregar_cultos_salvos()
+                        pd.concat([hist_db, novo_reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
                         st.success("✅ Salvo com sucesso!")
                         msg_wa = f"🙌 *Grupo Shekiná - Novo Louvor!*\n\nCulto: *{nome_c}*\n🎶 *Lista:* {', '.join(final_list)}"
                         st.session_state.link_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
@@ -131,7 +128,8 @@ if perfil == "Líder (Gestão)":
                     if n_m and n_a:
                         t_str = " ".join([t.lower().replace("õ", "o") for t in n_tags])
                         nova_mus = pd.DataFrame([[n_m, n_a, n_t, "Medio", t_str]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
-                        pd.concat([pd.read_csv(ARQUIVO_LOUVORES), nova_mus], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
+                        df_atual = carregar_dados()
+                        pd.concat([df_atual.drop(columns=['Musica_Busca']), nova_mus], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
                         st.success(f"'{n_m}' adicionado!")
                         st.rerun()
 
@@ -142,10 +140,10 @@ if perfil == "Líder (Gestão)":
                 st.session_state.dev_text = f"🌅 *Devocional Shekiná*\n*Tema:* {t_d}\n\nDeus é fiel!"
             if 'dev_text' in st.session_state:
                 txt = st.text_area("Edite:", st.session_state.dev_text)
-                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px;">📲 Enviar WhatsApp</button></a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">📲 Enviar WhatsApp</button></a>', unsafe_allow_html=True)
 
         with tab_historico:
-            st.subheader("📜 Histórico")
+            st.subheader("📜 Histórico de Cultos")
             h = carregar_cultos_salvos()
             if not h.empty:
                 for i, r in h.sort_values(by="Data_Culto", ascending=False).iterrows():
@@ -163,7 +161,10 @@ else:
         esc = st.selectbox("Selecione o Culto:", opc)
         if esc:
             d_s, n_s = esc.split(" | ")
-            reg = h_int[(h_int['Data_Culto'].astype(str) == d_s) & (h_int['Nome_Culto'] == n_s)].iloc[0]
-            m_l = reg['Musicas'].split(", ")
-            df_v = carregar_dados()
-            st.table(df_v[df_v['Musica'].isin(m_l)][['Musica', 'Artista', 'Tom']])
+            try:
+                reg = h_int[(h_int['Data_Culto'].astype(str) == d_s) & (h_int['Nome_Culto'] == n_s)].iloc[0]
+                m_l = reg['Musicas'].split(", ")
+                df_v = carregar_dados()
+                st.table(df_v[df_v['Musica'].isin(m_l)][['Musica', 'Artista', 'Tom']])
+            except:
+                st.error("Erro ao carregar este registro.")
