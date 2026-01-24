@@ -7,35 +7,40 @@ import os
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# 2. CSS NINJA: ESCONDE TUDO DO STREAMLIT E AJUSTA O VISUAL
+# --- SEGURANÇA: TELA DE ENTRADA DO APP ---
+# Isso impede que curiosos vejam qualquer conteúdo sem a senha inicial
+if 'autenticado_geral' not in st.session_state:
+    st.session_state.autenticado_geral = False
+
+if not st.session_state.autenticado_geral:
+    st.title("🛡️ Acesso Restrito - Grupo Shekiná")
+    # Substitua 'igreja2026' pela senha que você quer dar para TODOS os músicos
+    senha_entrada = st.text_input("Digite a senha de acesso da equipe:", type="password")
+    if st.button("Entrar no Sistema"):
+        if senha_entrada == "igreja2026": # SENHA GERAL DE ENTRADA
+            st.session_state.autenticado_geral = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta. Solicite ao líder do ministério.")
+    st.stop() # Interrompe o código aqui se não estiver autenticado
+
+# --- DAQUI PARA BAIXO O CÓDIGO SÓ RODA SE A PESSOA ACERTOU A SENHA ---
+
+# 2. CSS DE LIMPEZA
 st.markdown("""
     <style>
-    /* Ocultar elementos da plataforma */
-    [data-testid="stHeader"], header, footer, .stAppDeployButton {
-        display: none !important;
-        visibility: hidden !important;
-    }
+    [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
     #MainMenu {visibility: hidden !important;}
-    
-    /* Tentativa agressiva contra o Viewer Badge (Selo do Cloud) */
-    div[class^="viewerBadge"], [data-testid="stStatusWidget"], .viewerBadge_container__1QSob {
-        display: none !important;
-        opacity: 0 !important;
-    }
-
-    /* Ajuste de espaçamento interno */
-    .block-container {
-        padding-top: 2rem !important;
-    }
+    div[class^="viewerBadge"], [data-testid="stStatusWidget"] { display: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÕES DE ARQUIVOS ---
-SENHA_MESTRE = "shekina123" 
+# --- CONFIGURAÇÕES ---
+SENHA_LIDER = "shekina123" # Senha apenas para as funções de gestão
 ARQUIVO_LOUVORES = "louvores.csv"
 ARQUIVO_CULTOS = "cultos_salvos.csv"
 
-# --- FUNÇÕES DE BANCO DE DADOS ---
+# --- FUNÇÕES DE DADOS ---
 def carregar_dados():
     if not os.path.exists(ARQUIVO_LOUVORES):
         pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"]).to_csv(ARQUIVO_LOUVORES, index=False)
@@ -44,8 +49,7 @@ def carregar_dados():
         df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
         df['Tags'] = df['Tags'].fillna('').astype(str).str.lower().str.strip()
         return df
-    except:
-        return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
+    except: return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
 
 def carregar_cultos_salvos():
     if os.path.exists(ARQUIVO_CULTOS):
@@ -53,14 +57,11 @@ def carregar_cultos_salvos():
         except: pass
     return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
-# 3. SIDEBAR COM A SUA NOVA ASSINATURA
-st.sidebar.markdown("# 🛡️ Grupo Shekiná")
-
-# --- BOTÃO ASSINADO: BY COMUNICANDO IGREJAS ---
-link_ig = "https://www.instagram.com/comunicandoigrejas/"
+# 3. SIDEBAR COM ASSINATURA
+st.sidebar.markdown("# 🎸 Grupo Shekiná")
 st.sidebar.markdown(f'''
-    <a href="{link_ig}" target="_blank">
-        <button style="width: 100%; background-color: #333333; color: white; border: 1px solid #555555; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 25px; box-shadow: 0px 4px 10px rgba(0,0,0,0.2);">
+    <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
+        <button style="width: 100%; background-color: #333333; color: white; border: 1px solid #555555; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">
             🔧 By Comunicando Igrejas
         </button>
     </a>
@@ -68,11 +69,11 @@ st.sidebar.markdown(f'''
 
 perfil = st.sidebar.radio("Nível de Acesso:", ["Integrantes", "Líder (Gestão)"])
 
-# 4. PAINEL DO LÍDER
+# 4. LÓGICA DO LÍDER / INTEGRANTES
 if perfil == "Líder (Gestão)":
-    senha = st.sidebar.text_input("Senha:", type="password")
-    if senha == SENHA_MESTRE:
-        st.sidebar.success("Líder Autenticado!")
+    senha = st.sidebar.text_input("Senha de Gestor:", type="password")
+    if senha == SENHA_LIDER:
+        st.sidebar.success("Gestão Liberada")
         t1, t2, t3, t4 = st.tabs(["🎸 Repertório", "➕ Novo Louvor", "🌅 Devocional", "📜 Histórico"])
         
         df_m = carregar_dados()
@@ -81,63 +82,39 @@ if perfil == "Líder (Gestão)":
         with t1:
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("Filtrar Catálogo")
-                busca = st.text_input("Pesquisar louvor:").lower()
-                cat = st.selectbox("Estilo:", ["Ver Todos", "Varões", "Mulheres", "Jovens", "Adoração", "Louvor", "Santa Ceia", "Missões", "Apelo", "Santidade", "Agitados"])
-                
-                df_f = df_m.copy()
-                if cat != "Ver Todos":
-                    df_f = df_f[df_f['Tags'].str.contains(cat.lower().replace("õ", "o"), na=False)]
-                if busca:
-                    df_f = df_f[df_f['Musica_Busca'].str.contains(busca)]
-                
+                st.subheader("Buscar Louvores")
+                busca = st.text_input("Pesquisar:").lower()
+                df_f = df_m[df_m['Musica_Busca'].str.contains(busca)] if busca else df_m
                 sel = st.dataframe(df_f[['Musica', 'Artista', 'Tom']], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
-                
                 if 'cart' not in st.session_state: st.session_state.cart = []
                 if sel.selection.rows:
                     for m in df_f.iloc[sel.selection.rows]['Musica'].tolist():
                         if m not in st.session_state.cart: st.session_state.cart.append(m)
-
             with c2:
                 st.subheader("Publicar")
-                nome_c = st.text_input("Título do Culto:")
-                data_c = st.date_input("Data:", date.today())
-                
+                n_c = st.text_input("Culto:")
+                d_c = st.date_input("Data:", date.today())
                 cart_v = [m for m in st.session_state.cart if m in lista_of]
                 final = st.multiselect("Setlist:", options=lista_of, default=cart_v)
                 st.session_state.cart = final
-                
                 if st.button("💾 PUBLICAR AGORA"):
-                    if nome_c and final:
-                        reg = pd.DataFrame([[str(data_c), nome_c, ", ".join(final)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
+                    if n_c and final:
+                        reg = pd.DataFrame([[str(d_c), n_c, ", ".join(final)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
                         pd.concat([carregar_cultos_salvos(), reg], ignore_index=True).to_csv(ARQUIVO_CULTOS, index=False)
-                        st.success("✅ Repertório Online!")
-                        msg = f"🙌 *Grupo Shekiná*\n📌 *Culto:* {nome_c}\n🎶 *Músicas:* {', '.join(final)}"
-                        st.session_state.wa_link = f"https://wa.me/?text={urllib.parse.quote(msg)}"
-                
-                if 'wa_link' in st.session_state:
-                    st.markdown(f'<a href="{st.session_state.wa_link}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; font-weight: bold; cursor: pointer;">📢 MANDAR PRO WHATSAPP</button></a>', unsafe_allow_html=True)
+                        st.success("✅ Online!")
+                        msg = f"🙌 *Grupo Shekiná*\n📌 *Culto:* {n_c}\n🎶 *Lista:* {', '.join(final)}"
+                        st.session_state.wa = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+                if 'wa' in st.session_state:
+                    st.markdown(f'<a href="{st.session_state.wa}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; font-weight: bold;">📢 WHATSAPP</button></a>', unsafe_allow_html=True)
 
         with t2:
-            st.subheader("Cadastrar no Banco")
-            with st.form("add_louvor_v17"):
+            st.subheader("Cadastrar Louvor")
+            with st.form("add_l"):
                 nm, ar, tm = st.text_input("Música:"), st.text_input("Artista:"), st.text_input("Tom:")
-                tg = st.multiselect("Tags:", ["Adoração", "Louvor", "Varões", "Mulheres", "Jovens", "Santa Ceia", "Missões", "Apelo", "Santidade", "Agitados"])
-                if st.form_submit_button("✅ Salvar Música"):
-                    tag_s = " ".join([t.lower().replace("õ", "o") for t in tg])
-                    nova = pd.DataFrame([[nm, ar, tm, "Medio", tag_s]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])
-                    pd.concat([pd.read_csv(ARQUIVO_LOUVORES), nova], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
-                    st.success(f"'{nm}' adicionado!")
+                if st.form_submit_button("✅ Salvar"):
+                    pd.concat([pd.read_csv(ARQUIVO_LOUVORES), pd.DataFrame([[nm, ar, tm, "Medio", ""]], columns=["Musica", "Artista", "Tom", "Andamento", "Tags"])], ignore_index=True).to_csv(ARQUIVO_LOUVORES, index=False)
+                    st.success("Adicionado!")
                     st.rerun()
-
-        with t3:
-            st.subheader("Devocional")
-            tema = st.text_input("Tema:")
-            if st.button("Gerar"):
-                st.session_state.dev_msg = f"🌅 *Devocional - Shekiná*\n📍 *Tema:* {tema}\n\n🔧 By Comunicando Igrejas"
-            if 'dev_msg' in st.session_state:
-                txt = st.text_area("Mensagem:", st.session_state.dev_msg, height=150)
-                st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(txt)}" target="_blank"><button style="background-color: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">📲 Enviar WhatsApp</button></a>', unsafe_allow_html=True)
 
         with t4:
             st.subheader("Histórico")
@@ -145,20 +122,15 @@ if perfil == "Líder (Gestão)":
             if not h.empty:
                 for i, r in h.sort_values(by="Data_Culto", ascending=False).iterrows():
                     with st.expander(f"📅 {r['Data_Culto']} - {r['Nome_Culto']}"):
-                        st.write(f"🎶 **Setlist:** {r['Musicas']}")
-
-# 5. ÁREA DOS INTEGRANTES
+                        st.write(f"🎶 {r['Musicas']}")
 else:
     st.header("📖 Repertório Oficial")
     hist = carregar_cultos_salvos()
-    if hist.empty:
-        st.info("Nenhum repertório publicado.")
+    if hist.empty: st.info("Nenhum repertório publicado.")
     else:
-        opcoes = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
-        escolha = st.selectbox("Escolha o Culto:", opcoes)
+        op = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
+        escolha = st.selectbox("Selecione:", op)
         if escolha:
             d, n = escolha.split(" | ")
             reg = hist[(hist['Data_Culto'].astype(str) == d) & (hist['Nome_Culto'] == n)].iloc[0]
-            musicas = reg['Musicas'].split(", ")
-            df_v = carregar_dados()
-            st.table(df_v[df_v['Musica'].isin(musicas)][['Musica', 'Artista', 'Tom']])
+            st.table(carregar_dados()[carregar_dados()['Musica'].isin(reg['Musicas'].split(", "))][['Musica', 'Artista', 'Tom']])
