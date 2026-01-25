@@ -2,40 +2,40 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import date
-import urllib.parse
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# 2. CSS DE LIMPEZA E BRANDING (BY COMUNICANDO IGREJAS)
+# 2. CSS DE LIMPEZA E MARCA (By Comunicando Igrejas)
 st.markdown("""
     <style>
     [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
     #MainMenu {visibility: hidden !important;}
-    div[class^="viewerBadge"], [data-testid="stStatusWidget"] { display: none !important; }
     .block-container { padding-top: 1rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONEXÃO E FUNÇÕES DE DADOS ---
+# 3. CONEXÃO COM GOOGLE SHEETS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_louvores():
-    df = conn.read(worksheet="Louvores", ttl=0)
-    if df is not None and not df.empty:
-        df['Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
-    return df
+    try:
+        df = conn.read(worksheet="Louvores", ttl=0)
+        if df is not None and not df.empty:
+            # SOLUÇÃO DO ERRO image_ed4870.png: 
+            # Criamos a coluna de busca na memória, independente da planilha
+            df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
+        return df
+    except:
+        return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Categoria", "Musica_Busca"])
 
 def carregar_cultos():
-    return conn.read(worksheet="Cultos", ttl=0)
+    try:
+        return conn.read(worksheet="Cultos", ttl=0)
+    except:
+        return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
 
-# --- CONFIGURAÇÕES DE SEGURANÇA ---
-SENHA_GERAL = "igreja2026"
-SENHA_LIDER = "shekina123"
-LISTA_CATEGORIAS = ["Adoração", "Quebrantamento", "Congregacional", "Avivamento", "Espontâneo", "Júbilo", "Profético", "Antigo", "Clássico"]
-LISTA_ANDAMENTO = ["Lento", "Médio", "Rápido"]
-
-# 3. SIDEBAR
+# 4. SIDEBAR
 st.sidebar.markdown("# 🛡️ Grupo Shekiná")
 st.sidebar.markdown(f'''
     <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
@@ -45,96 +45,86 @@ st.sidebar.markdown(f'''
     </a>
     ''', unsafe_allow_html=True)
 
-# 4. LOGIN
+# 5. SEGURANÇA (Senhas)
 if 'auth' not in st.session_state: st.session_state.auth = False
+
 if not st.session_state.auth:
     st.title("🔑 Acesso Restrito")
-    s = st.text_input("Senha da Equipe:", type="password")
+    senha = st.text_input("Senha da Equipe:", type="password")
     if st.button("Entrar"):
-        if s in [SENHA_GERAL, SENHA_LIDER]:
+        if senha in ["igreja2026", "shekina123"]:
             st.session_state.auth = True
             st.rerun()
     st.stop()
 
-# 5. INTERFACE PRINCIPAL
+# 6. INTERFACE
 perfil = st.sidebar.radio("Nível:", ["Integrantes", "Líder"])
 
-if perfil == "Líder" and st.sidebar.text_input("Chave Mestre:", type="password") == SENHA_LIDER:
-    df_l = carregar_louvores()
-    t1, t2, t3, t4 = st.tabs(["🎸 Repertório", "➕ Cadastrar", "🗑️ Excluir", "📜 Histórico"])
-
-    with t1:
-        st.subheader("Montar Repertório")
-        c1, c2 = st.columns(2)
-        with c1: busca = st.text_input("Filtrar Nome:").lower()
-        with c2: f_cat = st.selectbox("Estilo:", ["Todos"] + LISTA_CATEGORIAS)
+if perfil == "Líder":
+    chave = st.sidebar.text_input("Chave Mestre:", type="password")
+    if chave == "shekina123":
+        t1, t2, t3, t4 = st.tabs(["🎸 Repertório", "➕ Cadastrar", "🗑️ Excluir", "📜 Histórico"])
+        df_l = carregar_louvores()
         
-        df_f = df_l.copy()
-        if f_cat != "Todos": df_f = df_f[df_f['Categoria'].str.contains(f_cat, na=False)]
-        if busca: df_f = df_f[df_f['Busca'].str.contains(busca)]
-        
-        sel = st.dataframe(df_f[['Musica', 'Artista', 'Tom', 'Andamento', 'Categoria']], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
-        
-        if 'set' not in st.session_state: st.session_state.set = []
-        if sel.selection.rows:
-            selec = df_f.iloc[sel.selection.rows]['Musica'].tolist()
-            for sm in selec:
-                if sm not in st.session_state.set: st.session_state.set.append(sm)
-        
-        st.write("---")
-        n_c = st.text_input("Título do Culto:")
-        dt_c = st.date_input("Data do Culto:", date.today())
-        final = st.multiselect("Setlist Final:", options=sorted(df_l['Musica'].tolist()), default=[m for m in st.session_state.set if m in df_l['Musica'].tolist()])
-        
-        if st.button("💾 PUBLICAR NO GOOGLE SHEETS"):
-            df_c_atual = carregar_cultos()
-            novo_c = pd.DataFrame([[str(dt_c), n_c, ", ".join(final)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
-            df_atualizado = pd.concat([df_c_atual, novo_c], ignore_index=True)
-            conn.update(worksheet="Cultos", data=df_atualizado)
-            st.success("✅ Publicado com sucesso!")
-            st.session_state.set = []
+        with t1:
+            st.subheader("Montar Repertório")
+            busca = st.text_input("Pesquisar louvor no catálogo:").lower()
+            
+            # Filtro usando a coluna criada na memória
+            df_f = df_l.copy()
+            if busca:
+                df_f = df_f[df_f['Musica_Busca'].str.contains(busca)]
+            
+            # Exibe apenas as colunas úteis para o usuário
+            colunas_ver = ["Musica", "Artista", "Tom", "Andamento", "Categoria"]
+            sel = st.dataframe(df_f[colunas_ver], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
+            
+            if 'cart' not in st.session_state: st.session_state.cart = []
+            if sel.selection.rows:
+                selecionadas = df_f.iloc[sel.selection.rows]['Musica'].tolist()
+                for s in selecionadas:
+                    if s not in st.session_state.cart: st.session_state.cart.append(s)
+            
+            st.write("---")
+            nome_c = st.text_input("Título do Culto:")
+            data_c = st.date_input("Data do Culto:", date.today())
+            final = st.multiselect("Setlist Final:", options=sorted(df_l['Musica'].tolist()), default=[m for m in st.session_state.cart if m in df_l['Musica'].tolist()])
+            st.session_state.cart = final
 
-    with t2:
-        st.subheader("Novo Cadastro")
-        with st.form("cad_form"):
-            m, a, t = st.text_input("Música:"), st.text_input("Artista:"), st.text_input("Tom:")
-            and_v = st.select_slider("Andamento:", options=LISTA_ANDAMENTO, value="Médio")
-            cat_v = st.multiselect("Categorias:", LISTA_CATEGORIAS)
-            if st.form_submit_button("Salvar na Nuvem"):
-                nova_m = pd.DataFrame([[m, a, t, and_v, ", ".join(cat_v)]], columns=["Musica", "Artista", "Tom", "Andamento", "Categoria"])
-                df_up = pd.concat([df_l.drop(columns=['Busca']), nova_m], ignore_index=True)
-                conn.update(worksheet="Louvores", data=df_up)
-                st.success("✅ Música salva no Google Sheets!")
+            if st.button("💾 PUBLICAR NO GOOGLE SHEETS"):
+                if nome_c and final:
+                    df_c_atual = carregar_cultos()
+                    novo_c = pd.DataFrame([[str(data_c), nome_c, ", ".join(final)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
+                    conn.update(worksheet="Cultos", data=pd.concat([df_c_atual, novo_c], ignore_index=True))
+                    st.success("✅ Publicado!")
+                    st.session_state.cart = []
 
-    with t3:
-        st.subheader("Excluir Louvor")
-        m_ex = st.selectbox("Escolha:", [""] + sorted(df_l['Musica'].tolist()))
-        if m_ex and st.button("Confirmar Exclusão"):
-            df_del = df_l[df_l['Musica'] != m_ex].drop(columns=['Busca'])
-            conn.update(worksheet="Louvores", data=df_del)
-            st.rerun()
+        with t2:
+            st.subheader("Novo Cadastro")
+            with st.form("cad_l"):
+                m, a, t = st.text_input("Música:"), st.text_input("Artista:"), st.text_input("Tom:")
+                and_v = st.select_slider("Andamento:", options=["Lento", "Médio", "Rápido"], value="Médio")
+                cat_v = st.multiselect("Categorias:", ["Adoração", "Júbilo", "Avivamento", "Antigo", "Congregacional"])
+                if st.form_submit_button("Salvar na Nuvem"):
+                    nova = pd.DataFrame([[m, a, t, and_v, ", ".join(cat_v)]], columns=["Musica", "Artista", "Tom", "Andamento", "Categoria"])
+                    df_up = pd.concat([df_l.drop(columns=['Musica_Busca'], errors='ignore'), nova], ignore_index=True)
+                    conn.update(worksheet="Louvores", data=df_up)
+                    st.success("Música cadastrada!")
 
-    with t4:
-        st.subheader("Histórico de Cultos")
-        h = carregar_cultos()
-        if h is not None and not h.empty:
-            if st.button("Limpar Histórico"):
-                conn.update(worksheet="Cultos", data=pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"]))
-                st.rerun()
-            st.dataframe(h, use_container_width=True, hide_index=True)
-
+        with t4:
+            st.subheader("Histórico")
+            st.dataframe(carregar_cultos(), use_container_width=True, hide_index=True)
 else:
+    # VISÃO INTEGRANTES
     st.header("📖 Repertório Oficial")
     hist = carregar_cultos()
-    if hist is None or hist.empty:
-        st.info("Nenhum repertório publicado.")
+    if hist.empty: st.info("Nada publicado.")
     else:
-        opcoes = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
-        escolha = st.selectbox("Selecione o Culto:", opcoes)
+        op = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
+        escolha = st.selectbox("Selecione o Culto:", op)
         if escolha:
-            dt_s, nm_s = escolha.split(" | ")
-            st.info(f"📅 **Data:** {dt_s} | ⛪ **Culto:** {nm_s}")
-            reg = hist[(hist['Data_Culto'].astype(str) == dt_s) & (hist['Nome_Culto'] == nm_s)].iloc[0]
-            m_lista = reg['Musicas'].split(", ")
+            dt, nm = escolha.split(" | ")
+            reg = hist[(hist['Data_Culto'].astype(str) == dt) & (hist['Nome_Culto'] == nm)].iloc[0]
+            m_list = reg['Musicas'].split(", ")
             df_full = carregar_louvores()
-            st.table(df_full[df_full['Musica'].isin(m_lista)][['Musica', 'Artista', 'Tom', 'Andamento', 'Categoria']])
+            st.table(df_full[df_full['Musica'].isin(m_list)][["Musica", "Artista", "Tom", "Andamento", "Categoria"]])
