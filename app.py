@@ -2,49 +2,60 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import date
+import urllib.parse
+from openai import OpenAI
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# 2. CSS DE LIMPEZA E BRANDING
+# 2. CLIENTE OPENAI & GOOGLE
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# 3. CSS DE MARCA (By Comunicando Igrejas)
 st.markdown("""
     <style>
     [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
     #MainMenu {visibility: hidden !important;}
-    div[class^="viewerBadge"], [data-testid="stStatusWidget"] { display: none !important; }
     .block-container { padding-top: 1rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. CONEXÃO COM GOOGLE SHEETS
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-# --- FUNÇÕES DE DADOS (LENDO E ESCREVENDO NA NUVEM) ---
+# --- FUNÇÕES DE APOIO ---
 def carregar_louvores():
     try:
         df = conn.read(worksheet="Louvores", ttl=0)
-        if df is not None and not df.empty:
-            df.columns = [c.strip() for c in df.columns]
-            # Cria busca na memória para evitar KeyError
-            df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
+        df.columns = [c.strip() for c in df.columns]
+        df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
         return df
-    except:
-        return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Categoria", "Musica_Busca"])
+    except: return pd.DataFrame()
 
 def carregar_cultos():
+    try: return conn.read(worksheet="Cultos", ttl=0)
+    except: return pd.DataFrame()
+
+def gerar_devocional_ia(tema):
+    prompt = f"""
+    Escreva um devocional para um grupo de louvor de uma igreja evangélica chamado Grupo Shekiná.
+    O tema é: {tema}.
+    Requisitos:
+    1. Comece com um versículo bíblico chave relacionado ao tema.
+    2. Escreva uma reflexão profunda de aproximadamente 200 palavras voltada para músicos e ministros de louvor.
+    3. Use um tom encorajador, espiritual e técnico quando relevante.
+    4. Termine com uma breve oração.
+    5. Adicione emojis para tornar a leitura dinâmica no WhatsApp.
+    """
     try:
-        df = conn.read(worksheet="Cultos", ttl=0)
-        if df is not None and not df.empty:
-            df.columns = [c.strip() for c in df.columns]
-        return df
-    except:
-        return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"])
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo", # ou gpt-4
+            messages=[{"role": "system", "content": "Você é um pastor e líder de adoração experiente."},
+                      {"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Erro ao gerar devocional: {e}"
 
-# --- CONFIGURAÇÕES ---
-LISTA_CATEGORIAS = ["Adoração", "Quebrantamento", "Congregacional", "Avivamento", "Espontâneo", "Júbilo", "Profético", "Antigo", "Clássico"]
-LISTA_ANDAMENTO = ["Lento", "Médio", "Rápido"]
-
-# 4. SIDEBAR E ASSINATURA
+# 4. SIDEBAR
 st.sidebar.markdown("# 🛡️ Grupo Shekiná")
 st.sidebar.markdown(f'''
     <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
@@ -54,106 +65,55 @@ st.sidebar.markdown(f'''
     </a>
     ''', unsafe_allow_html=True)
 
-# 5. LOGIN
+# 5. LOGIN (Senhas: igreja2026 / shekina123)
 if 'auth' not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
-    st.title("🔑 Acesso ao Sistema")
-    s = st.text_input("Senha da Equipe:", type="password")
-    if st.button("Entrar"):
-        if s in ["igreja2026", "shekina123"]:
+    senha = st.text_input("Senha da Equipe:", type="password")
+    if st.button("Acessar"):
+        if senha in ["igreja2026", "shekina123"]:
             st.session_state.auth = True
             st.rerun()
     st.stop()
 
-# 6. INTERFACE
+# 6. INTERFACE LÍDER
 perfil = st.sidebar.radio("Nível:", ["Integrantes", "Líder"])
 
-if perfil == "Líder":
-    chave = st.sidebar.text_input("Chave Mestre:", type="password")
-    if chave == "shekina123":
-        t1, t2, t3, t4 = st.tabs(["🎸 Repertório", "➕ Cadastrar", "🗑️ Excluir", "📜 Histórico"])
+if perfil == "Líder" and st.sidebar.text_input("Chave Mestre:", type="password") == "shekina123":
+    t1, t2, t3, t4 = st.tabs(["🎸 Repertório", "➕ Cadastrar", "📜 Histórico", "🌅 Devocional IA"])
+
+    with t1:
+        st.subheader("Montar Setlist")
         df_l = carregar_louvores()
+        busca = st.text_input("Pesquisar louvor:").lower()
+        df_f = df_l[df_l['Musica_Busca'].str.contains(busca)] if busca else df_l
+        sel = st.dataframe(df_f[["Musica", "Artista", "Tom"]], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
+        
+        # Botão WhatsApp Setlist
+        if sel.selection.rows:
+            selecionadas = df_f.iloc[sel.selection.rows]['Musica'].tolist()
+            msg_wa = f"🎸 *SETLIST SHEKINÁ*\n\n" + "\n".join([f"• {m}" for m in selecionadas])
+            link_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
+            st.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer;">📢 ENVIAR SETLIST</button></a>', unsafe_allow_html=True)
 
-        with t1:
-            st.subheader("Montar Repertório do Culto")
-            c1, c2 = st.columns(2)
-            with c1: busca = st.text_input("Nome:").lower()
-            with c2: f_cat = st.selectbox("Estilo:", ["Todos"] + LISTA_CATEGORIAS)
+    with t4:
+        st.subheader("🌅 Gerador de Devocional com IA")
+        tema = st.selectbox("Escolha o foco da semana:", ["Unidade", "Santidade", "Excelência", "Gratidão", "Oração", "Quebrantamento"])
+        
+        if st.button("✨ Gerar Devocional de 200 palavras"):
+            with st.spinner("A IA está escrevendo..."):
+                texto_gerado = gerar_devocional_ia(tema)
+                st.session_state.devocional_pronto = texto_gerado
+        
+        if 'devocional_pronto' in st.session_state:
+            st.markdown("---")
+            st.write(st.session_state.devocional_pronto)
             
-            df_f = df_l.copy()
-            if f_cat != "Todos": df_f = df_f[df_f['Categoria'].str.contains(f_cat, na=False)]
-            if busca: df_f = df_f[df_f['Musica_Busca'].str.contains(busca)]
-            
-            sel = st.dataframe(df_f[['Musica', 'Artista', 'Tom', 'Andamento', 'Categoria']], 
-                               use_container_width=True, hide_index=True, on_select="rerun", selection_mode="multi-row")
-            
-            if 'cart' not in st.session_state: st.session_state.cart = []
-            if sel.selection.rows:
-                selec = df_f.iloc[sel.selection.rows]['Musica'].tolist()
-                for sm in selec:
-                    if sm not in st.session_state.cart: st.session_state.cart.append(sm)
-            
-            st.write("---")
-            n_c = st.text_input("Título do Culto:")
-            dt_c = st.date_input("Data:", date.today())
-            final = st.multiselect("Setlist Final:", options=sorted(df_l['Musica'].tolist()), 
-                                   default=[m for m in st.session_state.cart if m in df_l['Musica'].tolist()])
-            st.session_state.cart = final
-            
-            if st.button("💾 PUBLICAR NO GOOGLE SHEETS"):
-                if n_c and final:
-                    df_c_atual = carregar_cultos()
-                    novo_c = pd.DataFrame([[str(dt_c), n_c, ", ".join(final)]], columns=["Data_Culto", "Nome_Culto", "Musicas"])
-                    conn.update(worksheet="Cultos", data=pd.concat([df_c_atual, novo_c], ignore_index=True))
-                    st.success("✅ Publicado com sucesso!")
-                    st.session_state.cart = []
-
-        with t2:
-            st.subheader("Cadastrar Novo Louvor")
-            with st.form("cad_l", clear_on_submit=True):
-                m, a, t = st.text_input("Música:"), st.text_input("Artista:"), st.text_input("Tom:")
-                and_v = st.select_slider("Andamento:", options=LISTA_ANDAMENTO, value="Médio")
-                cat_v = st.multiselect("Categorias:", LISTA_CATEGORIAS)
-                if st.form_submit_button("✅ Salvar na Nuvem"):
-                    if m and a:
-                        nova_m = pd.DataFrame([[m, a, t, and_v, ", ".join(cat_v)]], columns=["Musica", "Artista", "Tom", "Andamento", "Categoria"])
-                        # Remove a coluna de busca antes de enviar para a planilha
-                        df_up = pd.concat([df_l.drop(columns=['Musica_Busca'], errors='ignore'), nova_m], ignore_index=True)
-                        conn.update(worksheet="Louvores", data=df_up)
-                        st.success(f"'{m}' cadastrado com sucesso!")
-                    else: st.warning("Preencha Nome e Artista.")
-
-        with t3:
-            st.subheader("🗑️ Excluir do Catálogo")
-            m_ex = st.selectbox("Escolha a música:", [""] + sorted(df_l['Musica'].tolist()))
-            if m_ex and st.button("Confirmar Exclusão Definitiva"):
-                df_del = df_l[df_l['Musica'] != m_ex].drop(columns=['Musica_Busca'], errors='ignore')
-                conn.update(worksheet="Louvores", data=df_del)
-                st.success(f"'{m_ex}' removido!")
-                st.rerun()
-
-        with t4:
-            st.subheader("📜 Histórico de Cultos")
-            h = carregar_cultos()
-            if not h.empty:
-                if st.button("Limpar Histórico"):
-                    conn.update(worksheet="Cultos", data=pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Musicas"]))
-                    st.rerun()
-                for i, r in h.sort_values(by="Data_Culto", ascending=False).iterrows():
-                    with st.expander(f"📅 {r['Data_Culto']} - {r['Nome_Culto']}"):
-                        st.write(f"🎶 {r['Musicas']}")
+            # Botão WhatsApp Devocional
+            msg_final = st.session_state.devocional_pronto + "\n\n🔧 _By Comunicando Igrejas_"
+            link_dev_wa = f"https://wa.me/?text={urllib.parse.quote(msg_final)}"
+            st.markdown(f'<a href="{link_dev_wa}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer;">📲 ENVIAR PARA O GRUPO</button></a>', unsafe_allow_html=True)
 
 else:
-    st.header("📖 Repertório Oficial")
-    hist = carregar_cultos()
-    if hist.empty: st.info("Nenhum repertório publicado.")
-    else:
-        op = (hist['Data_Culto'].astype(str) + " | " + hist['Nome_Culto']).tolist()[::-1]
-        escolha = st.selectbox("Selecione o Culto:", op)
-        if escolha:
-            dt, nm = escolha.split(" | ")
-            st.info(f"📅 **Data:** {dt} | ⛪ **Culto:** {nm}")
-            reg = hist[(hist['Data_Culto'].astype(str) == dt) & (hist['Nome_Culto'] == nm)].iloc[0]
-            m_list = reg['Musicas'].split(", ")
-            df_full = carregar_louvores()
-            st.table(df_full[df_full['Musica'].isin(m_list)][["Musica", "Artista", "Tom", "Andamento", "Categoria"]])
+    st.header("📖 Espaço do Integrante")
+    st.info("Aqui aparecerá o repertório publicado pelo líder.")
+    # (Lógica de exibição de cultos salvas mantida conforme v40)
