@@ -8,11 +8,12 @@ import urllib.parse
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# 2. INICIALIZAÇÃO
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# 2. CLIENTE OPENAI & GOOGLE
+openai_key = st.secrets.get("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_key) if openai_key else None
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. CSS DE MARCA (By Comunicando Igrejas)
+# 3. CSS E IDENTIDADE VISUAL (Visível antes do login)
 st.markdown("""
     <style>
     [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
@@ -21,12 +22,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- CABEÇALHO E BOTÃO INSTAGRAM (SEMPRE VISÍVEIS) ---
+st.title("🎸 Grupo Shekiná")
+
+st.markdown(f'''
+    <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
+        <button style="width: 100%; background-color: #E1306C; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 25px;">
+            📸 By Comunicando Igrejas
+        </button>
+    </a>
+    ''', unsafe_allow_html=True)
+
 # --- FUNÇÕES DE DADOS ---
 def carregar_louvores():
     try:
         df = conn.read(worksheet="Louvores", ttl=0)
         df.columns = [c.strip() for c in df.columns]
-        df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower()
+        df['Musica_Busca'] = df['Musica'].fillna('').astype(str).str.lower().str.strip()
         return df
     except: return pd.DataFrame(columns=["Musica", "Artista", "Tom", "Andamento", "Categoria", "Musica_Busca"])
 
@@ -37,18 +49,18 @@ def carregar_cultos():
         return df
     except: return pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Tema_Culto", "Musicas"])
 
-# 4. LOGIN (igreja2026 / shekina123)
+# 4. LOGIN DO SISTEMA (Gateway)
 if 'auth' not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
     acesso = st.text_input("Senha da Equipe:", type="password")
-    if st.button("Acessar"):
+    if st.button("Entrar no Sistema"):
         if acesso in ["igreja2026", "shekina123"]:
             st.session_state.auth = True
             st.rerun()
     st.stop()
 
-# 5. INTERFACE
-perfil = st.sidebar.radio("Nível:", ["Integrantes", "Líder"])
+# 5. INTERFACE LOGADA
+perfil = st.sidebar.radio("Selecione seu nível:", ["Integrantes", "Líder"])
 
 if perfil == "Líder" and st.sidebar.text_input("Chave Mestre:", type="password") == "shekina123":
     df_l = carregar_louvores()
@@ -69,24 +81,22 @@ if perfil == "Líder" and st.sidebar.text_input("Chave Mestre:", type="password"
         c1, c2 = st.columns(2)
         with c1:
             nome_c = st.text_input("Tipo de Culto:")
-            data_c = st.date_input("Data do Culto:", date.today())
+            data_c = st.date_input("Data:", date.today())
         with c2:
-            tema_c = st.text_input("Tema do Culto:")
-            final_list = st.multiselect("Setlist Final:", options=sorted(df_l['Musica'].tolist()), 
+            tema_c = st.text_input("Tema:")
+            final_list = st.multiselect("Setlist Final:", options=sorted(df_l['Musica'].tolist()) if not df_l.empty else [], 
                                         default=[m for m in st.session_state.cart if m in df_l['Musica'].tolist()])
             st.session_state.cart = final_list
 
         if nome_c and final_list:
-            # Formatação de Data e Dia da Semana
-            dias_semana = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
-            dia_nome = dias_semana[data_c.weekday()]
+            dias = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
             data_formatada = data_c.strftime('%d-%m-%y')
+            dia_nome = dias[data_c.weekday()]
 
-            # Mensagem do WhatsApp (Emojis corrigidos com urllib.parse.quote)
+            # Template da Mensagem WhatsApp
             msg_wa = f"A paz do senhor grupo segue os louvores do culto *{nome_c}* .......\n\n"
             msg_wa += f"📅 *Data:* {data_formatada} ({dia_nome})\n"
-            msg_wa += f"📖 *Tema:* {tema_c}\n\n"
-            msg_wa += "🎶 *LOUVORES:*\n"
+            msg_wa += f"📖 *Tema:* {tema_c}\n\n🎶 *LOUVORES:*\n"
             for i, m in enumerate(final_list, 1): msg_wa += f"{i}. {m}\n"
             msg_wa += "\n🔧 _By Comunicando Igrejas_"
             
@@ -94,33 +104,27 @@ if perfil == "Líder" and st.sidebar.text_input("Chave Mestre:", type="password"
             with col_save:
                 if st.button("💾 PUBLICAR E SALVAR"):
                     df_h = carregar_cultos()
-                    # ORDEM DAS COLUNAS CORRIGIDA: Data, Nome, Tema, Musicas
-                    novo_registro = pd.DataFrame([[data_formatada, nome_c, tema_c, ", ".join(final_list)]], 
-                                                columns=["Data_Culto", "Nome_Culto", "Tema_Culto", "Musicas"])
-                    conn.update(worksheet="Cultos", data=pd.concat([df_h, novo_registro], ignore_index=True))
-                    st.success("✅ Registrado no histórico!")
-            
+                    novo = pd.DataFrame([[data_formatada, nome_c, tema_c, ", ".join(final_list)]], columns=df_h.columns)
+                    conn.update(worksheet="Cultos", data=pd.concat([df_h, novo], ignore_index=True))
+                    st.success("✅ Salvo no histórico!")
             with col_wa:
-                # O quote garante que emojis não virem triângulos
-                link_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
-                st.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📢 ENVIAR NO WHATSAPP</button></a>', unsafe_allow_html=True)
+                link = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
+                st.markdown(f'<a href="{link}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📢 ENVIAR WHATSAPP</button></a>', unsafe_allow_html=True)
 
     with t4:
         st.subheader("🌅 Devocional IA")
-        if st.button("✨ Gerar Devocional de 200 palavras"):
+        if st.button("✨ Gerar Mensagem de 200 palavras"):
             with st.spinner("IA escrevendo..."):
-                prompt = f"Escreva um devocional de 200 palavras sobre {tema_c if tema_c else 'Adoração'} para o Grupo Shekiná. Use emojis como 🙏, 📖, ✨. Sem triângulos."
+                prompt = f"Escreva um devocional para o Grupo Shekiná sobre {tema_c if tema_c else 'Adoração'}. Mínimo 200 palavras. Use emojis 🙏, ✨, 📖, 🕊️. Seja dinâmico."
                 res = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
-                texto_ia = res.choices[0].message.content
-                st.session_state.dev_ia = texto_ia
-        
+                st.session_state.dev_ia = res.choices[0].message.content
         if 'dev_ia' in st.session_state:
-            st.write(st.session_state.dev_ia)
+            st.info(st.session_state.dev_ia)
             link_dev = f"https://wa.me/?text={urllib.parse.quote(st.session_state.dev_ia + 'n\n🔧 _By Comunicando Igrejas_')}"
             st.markdown(f'<a href="{link_dev}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📢 ENVIAR DEVOCIONAL</button></a>', unsafe_allow_html=True)
 
 else:
-    # ÁREA INTEGRANTES (v51)
+    # ÁREA INTEGRANTES
     st.header("📖 Repertório Oficial")
     hist = carregar_cultos()
     if not hist.empty:
