@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 
+# Botão de retorno no topo
+if st.button("⬅️ Voltar para a Página Inicial"):
+    st.switch_page("paginas/inicial.py")
+
 st.title("📅 Programação de Cultos e Ensaios")
 
 conn = st.session_state.conn
