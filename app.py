@@ -44,14 +44,14 @@ def carregar_usuarios():
     except: 
         return pd.DataFrame(columns=["Nome", "WhatsApp", "Funcao", "Senha", "Status"])
 
-# 5. LOGIN DO SISTEMA (AGORA COM USUÁRIO E SENHA)
+# 5. LOGIN DO SISTEMA (USUÁRIO E SENHA)
 if 'auth' not in st.session_state: st.session_state.auth = False
 if 'user_funcao' not in st.session_state: st.session_state.user_funcao = "Integrante"
 if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -70,10 +70,9 @@ if not st.session_state.auth:
             
             if not usuario_valido.empty:
                 st.session_state.auth = True
-                # Pega a função exata salva na planilha (Líder ou Integrante)
                 st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao']
                 st.session_state.user_nome = usuario_valido.iloc[0]['Nome']
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
