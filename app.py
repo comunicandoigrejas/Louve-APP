@@ -6,11 +6,50 @@ import pandas as pd
 # 1. CONFIGURAÇÃO DA PÁGINA E OCULTAR BOTÕES DO STREAMLIT
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
+# Aplicação da identidade visual (Azul, Roxo, Verde, Laranja e Amarelo) com textos legíveis
 st.markdown("""
     <style>
+    /* Esconde elementos nativos do Streamlit */
     [data-testid="stHeader"], header, footer, .stAppDeployButton { display: none !important; }
     #MainMenu {visibility: hidden !important;}
     .block-container { padding-top: 1rem !important; }
+    
+    /* Customização de Cores Globais e Inputs */
+    .stButton>button {
+        background-color: #4a148c; /* Roxo Escuro */
+        color: white;
+        border-radius: 8px;
+        border: none;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #ff6d00; /* Laranja Vibrante no Hover */
+        color: white;
+    }
+    
+    /* Alertas e mensagens customizadas */
+    .stSuccess, div[data-testid="stNotification"] {
+        background-color: #1b5e20 !important; /* Verde Pentecostal */
+        color: white !important;
+    }
+    .stWarning {
+        background-color: #ffd600 !important; /* Amarelo */
+        color: black !important;
+    }
+    .stError {
+        background-color: #b71c1c !important; /* Vermelho padrão para erros */
+        color: white !important;
+    }
+    
+    /* Customização da Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #0d47a1; /* Azul Real / Marinho */
+        color: white;
+    }
+    [data-testid="stSidebar"] * {
+        color: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -18,7 +57,7 @@ st.markdown("""
 st.sidebar.markdown("# 🛡️ Grupo Shekiná")
 st.sidebar.markdown('''
     <a href="https://www.instagram.com/comunicandoigrejas/" target="_blank">
-        <button style="width: 100%; background-color: #333333; color: white; border: 1px solid #555555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px;">
+        <button style="width: 100%; background-color: #ff6d00; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px;">
             🔧 By Comunicando Igrejas
         </button>
     </a>
@@ -51,7 +90,7 @@ if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -72,7 +111,7 @@ if not st.session_state.auth:
                 st.session_state.auth = True
                 st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao']
                 st.session_state.user_nome = usuario_valido.iloc[0]['Nome']
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
