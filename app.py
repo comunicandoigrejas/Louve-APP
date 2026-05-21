@@ -90,7 +90,7 @@ if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -100,18 +100,18 @@ if not st.session_state.auth:
         if usuario_input and senha_input:
             df_user = carregar_usuarios()
             
-            # Procura na planilha se existe um usuário com esse Nome, Senha e se está Ativo
+            # CORREÇÃO AQUI: Mudado de 'usuario_input.lower().str.strip()' para 'usuario_input.lower().strip()'
             usuario_valido = df_user[
-                (df_user['Nome'].str.lower().str.strip() == usuario_input.lower().str.strip()) & 
-                (df_user['Senha'].astype(str) == senha_input.strip()) & 
-                (df_user['Status'] == 'Ativo')
+                (df_user['Nome'].str.lower().str.strip() == usuario_input.lower().strip()) & 
+                (df_user['Senha'].astype(str).str.strip() == senha_input.strip()) & 
+                (df_user['Status'].str.strip() == 'Ativo')
             ]
             
             if not usuario_valido.empty:
                 st.session_state.auth = True
-                st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao']
-                st.session_state.user_nome = usuario_valido.iloc[0]['Nome']
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
+                st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao'].strip()
+                st.session_state.user_nome = usuario_valido.iloc[0]['Nome'].strip()
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
