@@ -69,6 +69,7 @@ try:
         openai_key = st.secrets.get("OPENAI_API_KEY")
         st.session_state.openai_client = OpenAI(api_key=openai_key) if openai_key else None
     if "conn" not in st.session_state:
+        st.connection("gsheets", type=GSheetsConnection) # Apenas garante a criação
         st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception:
     st.error("Erro nos Secrets: Verifique as chaves OpenAI e as credenciais do Google Sheets.")
@@ -90,7 +91,7 @@ if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -100,18 +101,24 @@ if not st.session_state.auth:
         if usuario_input and senha_input:
             df_user = carregar_usuarios()
             
-            # Verificação segura sem o erro .str.strip() anterior
+            # Tratamento completo para ignorar maiúsculas/minúsculas e espaços extras
+            df_user['Nome_Limpo'] = df_user['Nome'].astype(str).str.lower().str.strip()
+            df_user['Senha_Limpa'] = df_user['Senha'].astype(str).str.strip()
+            df_user['Status_Limpo'] = df_user['Status'].astype(str).str.lower().str.strip()
+            
             usuario_valido = df_user[
-                (df_user['Nome'].str.lower().str.strip() == usuario_input.lower().strip()) & 
-                (df_user['Senha'].astype(str).str.strip() == senha_input.strip()) & 
-                (df_user['Status'].str.strip() == 'Ativo')
+                (df_user['Nome_Limpo'] == usuario_input.lower().strip()) & 
+                (df_user['Senha_Limpa'] == senha_input.strip()) & 
+                (df_user['Status_Limpo'] == 'ativo')
             ]
             
             if not usuario_valido.empty:
                 st.session_state.auth = True
-                st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao'].strip()
+                # Salva a função padronizada tirando espaços e acentos para a comparação do menu
+                funcao_original = usuario_valido.iloc[0]['Funcao'].strip()
+                st.session_state.user_funcao = funcao_original
                 st.session_state.user_nome = usuario_valido.iloc[0]['Nome'].strip()
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
@@ -125,7 +132,7 @@ st.sidebar.write(f"👤 **Usuário:** {st.session_state.user_nome}")
 st.sidebar.write(f"🛡️ **Perfil:** {st.session_state.user_funcao}")
 st.sidebar.write("---")
 
-# Definição das páginas visíveis a todos
+# Definição das páginas visíveis a todos os integrantes
 paginas_disponiveis = [
     st.Page("paginas/inicial.py", title="Página Inicial", icon="🏠"),
     st.Page("paginas/programacao.py", title="Programação", icon="📅"),
@@ -133,8 +140,9 @@ paginas_disponiveis = [
     st.Page("paginas/cifras.py", title="Cifras", icon="📜"),
 ]
 
-# Separação: Se na planilha o usuário estiver como "Líder", ele ganha acesso à página restrita
-if st.session_state.user_funcao == "Líder":
+# COMPARAÇÃO DO LÍDER BLINDADA: Aceita com acento, sem acento, maiúsculo ou minúsculo
+funcao_verificar = st.session_state.user_funcao.lower().strip()
+if funcao_verificar in ["líder", "lider"]:
     paginas_disponiveis.append(st.Page("paginas/lider.py", title="Painel do Líder", icon="🛠️"))
 
 # Inicia e roda a navegação do Streamlit
