@@ -69,7 +69,6 @@ try:
         openai_key = st.secrets.get("OPENAI_API_KEY")
         st.session_state.openai_client = OpenAI(api_key=openai_key) if openai_key else None
     if "conn" not in st.session_state:
-        st.connection("gsheets", type=GSheetsConnection) # Apenas garante a criação
         st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception:
     st.error("Erro nos Secrets: Verifique as chaves OpenAI e as credenciais do Google Sheets.")
@@ -91,7 +90,7 @@ if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -114,11 +113,10 @@ if not st.session_state.auth:
             
             if not usuario_valido.empty:
                 st.session_state.auth = True
-                # Salva a função padronizada tirando espaços e acentos para a comparação do menu
                 funcao_original = usuario_valido.iloc[0]['Funcao'].strip()
                 st.session_state.user_funcao = funcao_original
                 st.session_state.user_nome = usuario_valido.iloc[0]['Nome'].strip()
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
@@ -140,7 +138,7 @@ paginas_disponiveis = [
     st.Page("paginas/cifras.py", title="Cifras", icon="📜"),
 ]
 
-# COMPARAÇÃO DO LÍDER BLINDADA: Aceita com acento, sem acento, maiúsculo ou minúsculo
+# COMPARAÇÃO DO LÍDER: Aceita com acento, sem acento, maiúsculo ou minúsculo
 funcao_verificar = st.session_state.user_funcao.lower().strip()
 if funcao_verificar in ["líder", "lider"]:
     paginas_disponiveis.append(st.Page("paginas/lider.py", title="Painel do Líder", icon="🛠️"))
