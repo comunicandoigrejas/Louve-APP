@@ -3,104 +3,90 @@ import pandas as pd
 from datetime import date
 import urllib.parse
 
-# Botão de retorno estilizado
-if st.button("⬅️ Voltar para o Início"):
+# Botão de retorno seguro
+if st.button("⬅️ Voltar para a Página Inicial"):
     st.switch_page("paginas/inicial.py")
 
-st.title("🛠️ Painel Administrativo do Líder")
-st.markdown("### Bem-vindo, Líder! Aqui você organiza as escalas e o repertório.")
+st.title("🛠️ Cadastro de Cultos e Ensaios (Líder)")
+st.markdown("Use este painel para atualizar a agenda do grupo e escalar os louvores.")
 
 conn = st.session_state.conn
 
-# --- CARREGAMENTO DE DADOS ---
+# Carrega o repertório de louvores cadastrados
 try:
     df_louvores = conn.read(worksheet="Louvores", ttl=0)
     df_louvores.columns = [c.strip() for c in df_louvores.columns]
 except:
-    st.error("Erro ao carregar a aba 'Louvores'. Verifique a planilha.")
-    st.stop()
+    df_louvores = pd.DataFrame(columns=["Musica", "Artista", "Tom"])
 
+# Carrega o histórico de cultos lançados
 try:
     df_cultos = conn.read(worksheet="Cultos", ttl=0)
     df_cultos.columns = [c.strip() for c in df_cultos.columns]
 except:
     df_cultos = pd.DataFrame(columns=["Data_Culto", "Nome_Culto", "Tema_Culto", "Musicas"])
 
-# --- ORGANIZAÇÃO POR ABAS DENTRO DO PAINEL ---
-tab_escala, tab_repertorio = st.tabs(["🎸 Montar Escala de Louvor", "➕ Gerenciar Repertório"])
+# Abas de gerenciamento
+tab_cadastro, tab_historico = st.tabs(["📅 Agendar Culto / Ensaio", "📋 Ver Agendas Salvas"])
 
-with tab_escala:
-    st.subheader("Cadastrar Novo Culto ou Ensaio")
+with tab_cadastro:
+    st.subheader("Nova Escala de Louvor")
     
-    with st.container():
-        col1, col2 = st.columns(2)
-        with col1:
-            tipo_evento = st.selectbox("Tipo de Compromisso:", ["Culto de Celebração", "Ensaio do Grupo", "Vigília", "Congresso", "Outro"])
-            data_evento = st.date_input("Data do Evento:", date.today())
-        with col2:
-            tema_evento = st.text_input("Tema Central / Palavra:", placeholder="Ex: Santidade, Gratidão...")
-            # Busca de músicas para a escala
-            setlist_selecionada = st.multiselect("Selecione os Louvores (direto do repertório):", options=sorted(df_louvores['Musica'].tolist()))
-
+    tipo_evento = st.selectbox("Selecione o Tipo de Evento:", ["Culto de Celebração", "Ensaio do Grupo", "Culto de Doutrina", "Vigília", "Festividade"])
+    data_evento = st.date_input("Data marcada:", date.today())
+    tema_evento = st.text_input("Tema Central ou Palavra da Noite:", placeholder="Ex: Gratidão, Fé, Santidade...")
+    
+    # Seleção múltipla baseada nas músicas existentes na planilha
+    if not df_louvores.empty and 'Musica' in df_louvores.columns:
+        lista_opcoes = sorted(df_louvores['Musica'].dropna().tolist())
+        setlist = st.multiselect("Selecione as músicas para este dia:", options=lista_opcoes)
+    else:
+        st.warning("Nenhum louvor encontrado no repertório geral para seleção.")
+        setlist = []
+        
     st.write("---")
     
-    # Gerador de Mensagem para WhatsApp
-    if st.button("💾 SALVAR PROGRAMAÇÃO E GERAR ESCALA"):
-        if tipo_evento and setlist_selecionada:
-            # 1. Salvar na Planilha
-            data_formatada = data_evento.strftime('%d/%m/%y')
-            nova_escala = pd.DataFrame([[data_formatada, tipo_evento, tema_evento, ", ".join(setlist_selecionada)]], 
-                                        columns=["Data_Culto", "Nome_Culto", "Tema_Culto", "Musicas"])
+    if st.button("💾 SALVAR ESCALA NA PLANILHA", use_container_width=True):
+        if tipo_evento and setlist:
+            data_formatada = data_evento.strftime('%d/%m/%Y')
+            m_juntas = ", ".join(setlist)
             
-            # Atualiza a aba 'Cultos' no Sheets
-            df_atualizado = pd.concat([df_cultos, nova_escala], ignore_index=True)
-            conn.update(worksheet="Cultos", data=df_atualizado)
+            # Monta a nova linha
+            nova_linha = pd.DataFrame([[data_formatada, tipo_evento, tema_evento, m_juntas]], 
+                                       columns=["Data_Culto", "Nome_Culto", "Tema_Culto", "Musicas"])
             
-            st.success("✅ Programação salva com sucesso na planilha!")
+            # Une os dados antigos com o novo cadastro
+            df_final_cultos = pd.concat([df_cultos, nova_linha], ignore_index=True)
             
-            # 2. Criar texto para WhatsApp
-            texto_wa = f"*🛡️ GRUPO SHEKINÁ - ESCALA CONFIRMADA*\n\n"
-            texto_wa += f"📅 *Data:* {data_formatada}\n"
-            texto_wa += f"⛪ *Evento:* {tipo_evento}\n"
-            texto_wa += f"📖 *Tema:* {tema_evento}\n\n"
-            texto_wa += f"🎶 *LOUVORES SELECIONADOS:*\n"
-            for i, musica in enumerate(setlist_selecionada, 1):
-                texto_wa += f"{i}. {musica}\n"
-            texto_wa += f"\n_Prestem atenção aos tons marcados no App! Deus abençoe._"
+            # Envia diretamente para a worksheet "Cultos" do Google Sheets
+            conn.update(worksheet="Cultos", data=df_final_cultos)
+            st.success("🎉 Escala gravada com sucesso no Google Sheets!")
             
-            # Botão de envio para WhatsApp
-            link_wa = f"https://wa.me/?text={urllib.parse.quote(texto_wa)}"
+            # Gera o texto formatado para o WhatsApp
+            texto_formatado = f"*🛡️ GRUPO SHEKINÁ - NOVA ESCALA*\n\n"
+            texto_formatado += f"📅 *Data:* {data_formatada}\n"
+            texto_formatado += f"⛪ *Evento:* {tipo_evento}\n"
+            texto_formatado += f"📖 *Tema:* {tema_evento}\n\n"
+            texto_formatado += f"🎶 *REPERTÓRIO:*\n"
+            for idx, musica in enumerate(setlist, 1):
+                texto_formatado += f" {idx}. {musica}\n"
+            texto_formatado += f"\n_Acedam ao nosso App para consultar os tons e as cifras!_"
+            
+            # Link de envio direto
+            link_whatsapp = f"https://wa.me/?text={urllib.parse.quote(texto_formatado)}"
             st.markdown(f'''
-                <a href="{link_wa}" target="_blank">
-                    <button style="width:100%; background-color:#25D366; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer;">
-                        📢 ENVIAR ESCALA NO WHATSAPP DO GRUPO
+                <a href="{link_whatsapp}" target="_blank">
+                    <button style="width:100%; background-color:#25D366; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer;">
+                        📢 COMPARTILHAR ESCALA NO WHATSAPP DO GRUPO
                     </button>
                 </a>
             ''', unsafe_allow_html=True)
         else:
-            st.warning("Por favor, preencha o nome do evento e selecione ao menos uma música.")
+            st.error("Por favor, selecione pelo menos uma música para salvar a escala.")
 
-with tab_repertorio:
-    st.subheader("Adicionar Louvor ao Repertório Geral")
-    with st.form("add_louvor", clear_on_submit=True):
-        c1, c2, c3 = st.columns([2, 1, 1])
-        with c1: nova_musica = st.text_input("Nome da Música:")
-        with c2: novo_artista = st.text_input("Artista/Ministério:")
-        with c3: novo_tom = st.text_input("Tom Sugerido:")
-        
-        if st.form_submit_button("➕ Cadastrar no Repertório"):
-            if nova_musica and novo_artista:
-                novo_item = pd.DataFrame([[nova_musica, novo_artista, novo_tom, "Média", "Geral"]], 
-                                          columns=["Musica", "Artista", "Tom", "Andamento", "Categoria"])
-                # Remove colunas de busca temporária se existirem
-                df_louvores_limpo = df_louvores.drop(columns=['Musica_Busca'], errors='ignore')
-                df_final = pd.concat([df_louvores_limpo, novo_item], ignore_index=True)
-                conn.update(worksheet="Louvores", data=df_final)
-                st.success(f"Música '{nova_musica}' adicionada ao repertório!")
-            else:
-                st.error("Preencha ao menos o nome da música e o artista.")
-
-# Exibição do Histórico recente de cultos para o líder
-st.write("---")
-st.subheader("📋 Últimas Programações Lançadas")
-st.dataframe(df_cultos.iloc[::-1], use_container_width=True, hide_index=True)
+with tab_historico:
+    st.subheader("Histórico de Escalas Gravadas")
+    if not df_cultos.empty:
+        st.dataframe(df_cultos.iloc[::-1], use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhuma escala gravada na tabela 'Cultos' até ao momento.")
