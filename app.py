@@ -4,7 +4,7 @@ from openai import OpenAI
 import pandas as pd
 
 # 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL
-st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
+st.set_page_config(page_title="Louve-APP", page_icon="🎸", layout="wide")
 
 st.markdown("""
     <style>
