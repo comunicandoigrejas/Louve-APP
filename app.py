@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 from openai import OpenAI
 import pandas as pd
 
-# 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL (Tons: Azul, Roxo, Verde, Laranja e Amarelo)
+# 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
 st.markdown("""
@@ -62,7 +62,7 @@ st.sidebar.markdown('''
     </a>
     ''', unsafe_allow_html=True)
 
-# 3. INICIALIZAÇÃO DE CONEXÕES COM TRATAMENTO SEGURO
+# 3. INICIALIZAÇÃO DE CONEXÕES COMT RATAMENTO SEGURO
 if "openai_client" not in st.session_state:
     try:
         openai_key = st.secrets.get("OPENAI_API_KEY")
@@ -77,16 +77,14 @@ if "conn" not in st.session_state:
         st.error("Erro crítico: Não foi possível conectar ao Google Sheets. Verifique os Secrets.")
         st.stop()
 
-# 4. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS INTELIGENTE
+# 4. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS
 def carregar_usuarios():
     try:
         df = st.session_state.conn.read(worksheet="Usuarios", ttl=0)
-        # Limpa espaços em branco dos nomes das colunas
         df.columns = [str(c).strip() for c in df.columns]
         return df
     except: 
-        # Retorna colunas em português e inglês por segurança
-        return pd.DataFrame(columns=["Nome", "Funcao", "Senha", "Status", "Name", "Role", "Password"])
+        return pd.DataFrame(columns=["Nome", "Funcao", "Senha", "Status"])
 
 # 5. INICIALIZAÇÃO DOS ESTADOS DA SESSÃO
 if 'auth' not in st.session_state: st.session_state.auth = False
@@ -106,13 +104,11 @@ if not st.session_state.auth:
             df_user = carregar_usuarios()
             
             if not df_user.empty:
-                # Resolve problemas se a coluna estiver em Inglês ou Português
                 col_nome = 'Nome' if 'Nome' in df_user.columns else 'Name'
                 col_senha = 'Senha' if 'Senha' in df_user.columns else 'Password'
                 col_funcao = 'Funcao' if 'Funcao' in df_user.columns else 'Role'
                 col_status = 'Status' if 'Status' in df_user.columns else 'Status'
                 
-                # Cria colunas limpas para comparação definitiva
                 df_user['Nome_Limpo'] = df_user[col_nome].astype(str).str.lower().str.strip()
                 df_user['Senha_Limpa'] = df_user[col_senha].astype(str).str.strip()
                 df_user['Status_Limpo'] = df_user[col_status].astype(str).str.lower().str.strip()
@@ -138,12 +134,12 @@ if not st.session_state.auth:
             
     st.stop()
 
-# --- MENU DE NAVEGAÇÃO (APÓS LOGIN) ---
+# --- MENU DE NAVEGAÇÃO (APÓS LOGIN BEM-SUCEDIDO) ---
 st.sidebar.write(f"👤 **Usuário:** {st.session_state.user_nome}")
 st.sidebar.write(f"🛡️ **Perfil:** {st.session_state.user_funcao}")
 st.sidebar.write("---")
 
-# Páginas visíveis para todos os membros do grupo
+# Abas comuns para todos os integrantes
 paginas_disponiveis = [
     st.Page("paginas/inicial.py", title="Página Inicial", icon="🏠"),
     st.Page("paginas/programacao.py", title="Programação", icon="📅"),
@@ -151,11 +147,11 @@ paginas_disponiveis = [
     st.Page("paginas/cifras.py", title="Cifras", icon="📜"),
 ]
 
-# ABA EXCLUSIVA DO LÍDER: Sincroniza e adiciona o painel de cadastro de cultos/ensaios
+# Liberação dinâmica do Painel do Líder baseado na função do Google Sheets
 funcao_verificar = st.session_state.user_funcao.lower().strip()
 if funcao_verificar in ["líder", "lider", "leader"]:
     paginas_disponiveis.append(st.Page("paginas/lider.py", title="Painel do Líder", icon="🛠️"))
 
-# Executa o gerenciador de navegação oficial
+# Executa o sistema nativo de navegação por páginas
 pg = st.navigation(paginas_disponiveis)
 pg.run()
