@@ -3,12 +3,12 @@ import pandas as pd
 from datetime import date
 import urllib.parse
 
-# Botão de retorno seguro para a Página Inicial centrizada
+# Botão de retorno seguro para a Página Inicial centralizada
 if st.button("⬅️ Voltar para a Página Inicial"):
     st.switch_page("paginas/inicial.py")
 
 st.title("🛠️ Painel de Controle e Gestão (Líder)")
-st.markdown("Seja bem-vindo, varão! Aqui você gerencia toda a plataforma do Grupo Shekiná.")
+st.markdown("Seja bem-vindo, abençoado! Aqui você gerencia toda a plataforma do Grupo Shekiná.")
 
 conn = st.session_state.conn
 
@@ -113,11 +113,9 @@ with tab_novo_louvor:
             
         if st.form_submit_button("➕ Gravar no Repertório", use_container_width=True):
             if nome_musica and artista_musica:
-                # Cria a nova linha correspondente às colunas do Sheets
                 nova_musica_df = pd.DataFrame([[nome_musica, artista_musica, tom_musica, andamento_musica, categoria_musica]], 
                                                columns=["Musica", "Artista", "Tom", "Andamento", "Categoria"])
                 
-                # Sincroniza e envia
                 df_louvores_limpo = df_louvores.drop(columns=['Musica_Busca'], errors='ignore')
                 df_final_louvores = pd.concat([df_louvores_limpo, nova_musica_df], ignore_index=True)
                 conn.update(worksheet="Louvores", data=df_final_louvores)
@@ -127,7 +125,6 @@ with tab_novo_louvor:
 
 
 # ================= TAB 3: CADASTRAR NOVA CIFRA =================
-with tab_nova_cifra =================
 with tab_nova_cifra:
     st.subheader("Adicionar Cifra ou Link de Apoio")
     st.markdown("Esta aba alimenta os botões de redirecionamento que os músicos abrem na aba Cifras.")
@@ -146,7 +143,6 @@ with tab_nova_cifra:
         
         if st.form_submit_button("➕ Gravar na Biblioteca de Cifras", use_container_width=True):
             if cifra_musica and cifra_link:
-                # Cria a nova linha correspondente à aba Cifras do Sheets
                 nova_cifra_df = pd.DataFrame([[cifra_musica, cifra_artista, cifra_tom, cifra_tipo, cifra_link]], 
                                               columns=["Musica", "Artista", "Tom_Padrao", "Tipo_Arquivo", "Link_Cifra"])
                 
