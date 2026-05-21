@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 
+# Botão de retorno no topo
+if st.button("⬅️ Voltar para a Página Inicial"):
+    st.switch_page("paginas/inicial.py")
+
 st.title("📜 Biblioteca de Cifras e Links")
 
 conn = st.session_state.conn
