@@ -56,3 +56,22 @@ with col_devocional:
         st.write(st.session_state.dev_final)
     else:
         st.write("O líder ainda não gerou a palavra oficial para a próxima escala. Fique conectado!")
+
+st.write("---")
+
+# --- BOTÃO DE SAIR (LOGOUT) ---
+st.markdown("### 🚪 Segurança")
+col_logout, col_vazio = st.columns([1, 2])
+
+with col_logout:
+    if st.button("🔴 Sair do Aplicativo", use_container_width=True):
+        # Limpa as variáveis de autenticação da sessão
+        st.session_state.auth = False
+        st.session_state.user_funcao = "Integrante"
+        st.session_state.user_nome = ""
+        # Limpa o carrinho de músicas se houver
+        if 'cart' in st.session_state:
+            st.session_state.cart = []
+        
+        st.success("Sessão encerrada com sucesso! Redirecionando...")
+        st.rerun()
