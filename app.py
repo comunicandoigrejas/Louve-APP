@@ -90,7 +90,7 @@ if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
-    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.") [cite: 2025-08-14]
+    st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
     
     # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
@@ -100,7 +100,7 @@ if not st.session_state.auth:
         if usuario_input and senha_input:
             df_user = carregar_usuarios()
             
-            # CORREÇÃO AQUI: Mudado de 'usuario_input.lower().str.strip()' para 'usuario_input.lower().strip()'
+            # Verificação segura sem o erro .str.strip() anterior
             usuario_valido = df_user[
                 (df_user['Nome'].str.lower().str.strip() == usuario_input.lower().strip()) & 
                 (df_user['Senha'].astype(str).str.strip() == senha_input.strip()) & 
@@ -111,7 +111,7 @@ if not st.session_state.auth:
                 st.session_state.auth = True
                 st.session_state.user_funcao = usuario_valido.iloc[0]['Funcao'].strip()
                 st.session_state.user_nome = usuario_valido.iloc[0]['Nome'].strip()
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...") [cite: 2025-08-14]
+                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
                 st.rerun()
             else: 
                 st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
