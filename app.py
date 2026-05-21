@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 from openai import OpenAI
 import pandas as pd
 
-# 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL
+# 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL (Tons: Azul, Roxo, Verde, Laranja e Amarelo)
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
 st.markdown("""
@@ -62,7 +62,7 @@ st.sidebar.markdown('''
     </a>
     ''', unsafe_allow_html=True)
 
-# 3. INICIALIZAÇÃO DE CONEXÕES
+# 3. INICIALIZAÇÃO DE CONEXÕES COM TRATAMENTO SEGURO
 if "openai_client" not in st.session_state:
     try:
         openai_key = st.secrets.get("OPENAI_API_KEY")
@@ -73,26 +73,25 @@ if "openai_client" not in st.session_state:
 if "conn" not in st.session_state:
     try:
         st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
-    except Exception as e:
-        st.error("Erro ao conectar com o Google Sheets. Verifique os Secrets.")
+    except:
+        st.error("Erro crítico: Não foi possível conectar ao Google Sheets. Verifique os Secrets.")
         st.stop()
 
-# 4. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS
+# 4. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS INTELIGENTE
 def carregar_usuarios():
     try:
         df = st.session_state.conn.read(worksheet="Usuarios", ttl=0)
-        df.columns = [c.strip() for c in df.columns]
+        # Limpa espaços em branco dos nomes das colunas
+        df.columns = [str(c).strip() for c in df.columns]
         return df
     except: 
-        return pd.DataFrame(columns=["Nome", "WhatsApp", "Funcao", "Senha", "Status"])
+        # Retorna colunas em português e inglês por segurança
+        return pd.DataFrame(columns=["Nome", "Funcao", "Senha", "Status", "Name", "Role", "Password"])
 
-# 5. GERENCIAMENTO DE ESTADO DO LOGIN
-if 'auth' not in st.session_state: 
-    st.session_state.auth = False
-if 'user_funcao' not in st.session_state: 
-    st.session_state.user_funcao = "Integrante"
-if 'user_nome' not in st.session_state: 
-    st.session_state.user_nome = ""
+# 5. INICIALIZAÇÃO DOS ESTADOS DA SESSÃO
+if 'auth' not in st.session_state: st.session_state.auth = False
+if 'user_funcao' not in st.session_state: st.session_state.user_funcao = "Integrante"
+if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
 
 # --- TELA DE LOGIN ---
 if not st.session_state.auth:
@@ -107,10 +106,16 @@ if not st.session_state.auth:
             df_user = carregar_usuarios()
             
             if not df_user.empty:
-                # Padronização de colunas para busca segura
-                df_user['Nome_Limpo'] = df_user['Nome'].astype(str).str.lower().str.strip()
-                df_user['Senha_Limpa'] = df_user['Senha'].astype(str).str.strip()
-                df_user['Status_Limpo'] = df_user['Status'].astype(str).str.lower().str.strip()
+                # Resolve problemas se a coluna estiver em Inglês ou Português
+                col_nome = 'Nome' if 'Nome' in df_user.columns else 'Name'
+                col_senha = 'Senha' if 'Senha' in df_user.columns else 'Password'
+                col_funcao = 'Funcao' if 'Funcao' in df_user.columns else 'Role'
+                col_status = 'Status' if 'Status' in df_user.columns else 'Status'
+                
+                # Cria colunas limpas para comparação definitiva
+                df_user['Nome_Limpo'] = df_user[col_nome].astype(str).str.lower().str.strip()
+                df_user['Senha_Limpa'] = df_user[col_senha].astype(str).str.strip()
+                df_user['Status_Limpo'] = df_user[col_status].astype(str).str.lower().str.strip()
                 
                 usuario_valido = df_user[
                     (df_user['Nome_Limpo'] == usuario_input.lower().strip()) & 
@@ -120,26 +125,25 @@ if not st.session_state.auth:
                 
                 if not usuario_valido.empty:
                     st.session_state.auth = True
-                    st.session_state.user_funcao = str(usuario_valido.iloc[0]['Funcao']).strip()
-                    st.session_state.user_nome = str(usuario_valido.iloc[0]['Nome']).strip()
+                    st.session_state.user_funcao = str(usuario_valido.iloc[0][col_funcao]).strip()
+                    st.session_state.user_nome = str(usuario_valido.iloc[0][col_nome]).strip()
                     st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
                     st.rerun()
                 else: 
-                    st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
+                    st.error("Nome de usuário ou senha incorretos, ou cadastro inativo!")
             else:
-                st.error("Não foi possível ler a tabela de usuários. Verifique as abas da planilha.")
+                st.error("A tabela de usuários está vazia ou inacessível no momento.")
         else:
             st.warning("Por favor, preencha o Usuário e a Senha.")
-    
-    # Interrompe a execução aqui para não mostrar o menu sem logar
+            
     st.stop()
 
-# --- MENU DE NAVEGAÇÃO (SÓ EXECUTA SE AUTH FOR TRUE) ---
+# --- MENU DE NAVEGAÇÃO (APÓS LOGIN) ---
 st.sidebar.write(f"👤 **Usuário:** {st.session_state.user_nome}")
 st.sidebar.write(f"🛡️ **Perfil:** {st.session_state.user_funcao}")
 st.sidebar.write("---")
 
-# Definição das páginas padrão para todos
+# Páginas visíveis para todos os membros do grupo
 paginas_disponiveis = [
     st.Page("paginas/inicial.py", title="Página Inicial", icon="🏠"),
     st.Page("paginas/programacao.py", title="Programação", icon="📅"),
@@ -147,11 +151,11 @@ paginas_disponiveis = [
     st.Page("paginas/cifras.py", title="Cifras", icon="📜"),
 ]
 
-# Liberação blindada do Painel do Líder
-funcao_teste = st.session_state.user_funcao.lower().strip()
-if funcao_teste in ["líder", "lider"]:
+# ABA EXCLUSIVA DO LÍDER: Sincroniza e adiciona o painel de cadastro de cultos/ensaios
+funcao_verificar = st.session_state.user_funcao.lower().strip()
+if funcao_verificar in ["líder", "lider", "leader"]:
     paginas_disponiveis.append(st.Page("paginas/lider.py", title="Painel do Líder", icon="🛠️"))
 
-# Executa o sistema de navegação multi-páginas do Streamlit
+# Executa o gerenciador de navegação oficial
 pg = st.navigation(paginas_disponiveis)
 pg.run()
