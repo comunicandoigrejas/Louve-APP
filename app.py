@@ -3,10 +3,9 @@ from streamlit_gsheets import GSheetsConnection
 from openai import OpenAI
 import pandas as pd
 
-# 1. CONFIGURAÇÃO DA PÁGINA E OCULTAR BOTÕES DO STREAMLIT
+# 1. CONFIGURAÇÃO DA PÁGINA E IDENTIDADE VISUAL
 st.set_page_config(page_title="Grupo Shekiná", page_icon="🎸", layout="wide")
 
-# Aplicação da identidade visual (Azul, Roxo, Verde, Laranja e Amarelo) com textos legíveis
 st.markdown("""
     <style>
     /* Esconde elementos nativos do Streamlit */
@@ -64,15 +63,19 @@ st.sidebar.markdown('''
     ''', unsafe_allow_html=True)
 
 # 3. INICIALIZAÇÃO DE CONEXÕES
-try:
-    if "openai_client" not in st.session_state:
+if "openai_client" not in st.session_state:
+    try:
         openai_key = st.secrets.get("OPENAI_API_KEY")
         st.session_state.openai_client = OpenAI(api_key=openai_key) if openai_key else None
-    if "conn" not in st.session_state:
+    except:
+        st.session_state.openai_client = None
+
+if "conn" not in st.session_state:
+    try:
         st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception:
-    st.error("Erro nos Secrets: Verifique as chaves OpenAI e as credenciais do Google Sheets.")
-    st.stop()
+    except Exception as e:
+        st.error("Erro ao conectar com o Google Sheets. Verifique os Secrets.")
+        st.stop()
 
 # 4. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS
 def carregar_usuarios():
@@ -83,16 +86,19 @@ def carregar_usuarios():
     except: 
         return pd.DataFrame(columns=["Nome", "WhatsApp", "Funcao", "Senha", "Status"])
 
-# 5. LOGIN DO SISTEMA (USUÁRIO E SENHA)
-if 'auth' not in st.session_state: st.session_state.auth = False
-if 'user_funcao' not in st.session_state: st.session_state.user_funcao = "Integrante"
-if 'user_nome' not in st.session_state: st.session_state.user_nome = ""
+# 5. GERENCIAMENTO DE ESTADO DO LOGIN
+if 'auth' not in st.session_state: 
+    st.session_state.auth = False
+if 'user_funcao' not in st.session_state: 
+    st.session_state.user_funcao = "Integrante"
+if 'user_nome' not in st.session_state: 
+    st.session_state.user_nome = ""
 
+# --- TELA DE LOGIN ---
 if not st.session_state.auth:
     st.title("🔑 Acesso ao Sistema")
     st.markdown("Seja bem-vindo, abençoado! Insira suas credenciais para acessar o painel.")
     
-    # Campos de Entrada de Texto para o Login Duplo
     usuario_input = st.text_input("Nome de Usuário (Ex: Willian):")
     senha_input = st.text_input("Senha de acesso:", type="password")
     
@@ -100,37 +106,40 @@ if not st.session_state.auth:
         if usuario_input and senha_input:
             df_user = carregar_usuarios()
             
-            # Tratamento completo para ignorar maiúsculas/minúsculas e espaços extras
-            df_user['Nome_Limpo'] = df_user['Nome'].astype(str).str.lower().str.strip()
-            df_user['Senha_Limpa'] = df_user['Senha'].astype(str).str.strip()
-            df_user['Status_Limpo'] = df_user['Status'].astype(str).str.lower().str.strip()
-            
-            usuario_valido = df_user[
-                (df_user['Nome_Limpo'] == usuario_input.lower().strip()) & 
-                (df_user['Senha_Limpa'] == senha_input.strip()) & 
-                (df_user['Status_Limpo'] == 'ativo')
-            ]
-            
-            if not usuario_valido.empty:
-                st.session_state.auth = True
-                funcao_original = usuario_valido.iloc[0]['Funcao'].strip()
-                st.session_state.user_funcao = funcao_original
-                st.session_state.user_nome = usuario_valido.iloc[0]['Nome'].strip()
-                st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
-                st.rerun()
-            else: 
-                st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
+            if not df_user.empty:
+                # Padronização de colunas para busca segura
+                df_user['Nome_Limpo'] = df_user['Nome'].astype(str).str.lower().str.strip()
+                df_user['Senha_Limpa'] = df_user['Senha'].astype(str).str.strip()
+                df_user['Status_Limpo'] = df_user['Status'].astype(str).str.lower().str.strip()
+                
+                usuario_valido = df_user[
+                    (df_user['Nome_Limpo'] == usuario_input.lower().strip()) & 
+                    (df_user['Senha_Limpa'] == senha_input.strip()) & 
+                    (df_user['Status_Limpo'] == 'ativo')
+                ]
+                
+                if not usuario_valido.empty:
+                    st.session_state.auth = True
+                    st.session_state.user_funcao = str(usuario_valido.iloc[0]['Funcao']).strip()
+                    st.session_state.user_nome = str(usuario_valido.iloc[0]['Nome']).strip()
+                    st.success(f"Paz do Senhor, irmão {st.session_state.user_nome}! Entrando...")
+                    st.rerun()
+                else: 
+                    st.error("Usuário ou senha incorretos, ou cadastro inativo! Verifique com o seu Líder.")
+            else:
+                st.error("Não foi possível ler a tabela de usuários. Verifique as abas da planilha.")
         else:
             st.warning("Por favor, preencha o Usuário e a Senha.")
-            
+    
+    # Interrompe a execução aqui para não mostrar o menu sem logar
     st.stop()
 
-# --- MENU DE NAVEGAÇÃO APÓS LOGIN BEM-SUCEDIDO ---
+# --- MENU DE NAVEGAÇÃO (SÓ EXECUTA SE AUTH FOR TRUE) ---
 st.sidebar.write(f"👤 **Usuário:** {st.session_state.user_nome}")
 st.sidebar.write(f"🛡️ **Perfil:** {st.session_state.user_funcao}")
 st.sidebar.write("---")
 
-# Definição das páginas visíveis a todos os integrantes
+# Definição das páginas padrão para todos
 paginas_disponiveis = [
     st.Page("paginas/inicial.py", title="Página Inicial", icon="🏠"),
     st.Page("paginas/programacao.py", title="Programação", icon="📅"),
@@ -138,11 +147,11 @@ paginas_disponiveis = [
     st.Page("paginas/cifras.py", title="Cifras", icon="📜"),
 ]
 
-# COMPARAÇÃO DO LÍDER: Aceita com acento, sem acento, maiúsculo ou minúsculo
-funcao_verificar = st.session_state.user_funcao.lower().strip()
-if funcao_verificar in ["líder", "lider"]:
+# Liberação blindada do Painel do Líder
+funcao_teste = st.session_state.user_funcao.lower().strip()
+if funcao_teste in ["líder", "lider"]:
     paginas_disponiveis.append(st.Page("paginas/lider.py", title="Painel do Líder", icon="🛠️"))
 
-# Inicia e roda a navegação do Streamlit
+# Executa o sistema de navegação multi-páginas do Streamlit
 pg = st.navigation(paginas_disponiveis)
 pg.run()
