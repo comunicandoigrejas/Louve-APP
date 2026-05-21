@@ -10,7 +10,7 @@ st.markdown("### 🚀 Atalhos Rápidos")
 funcao_usuario = st.session_state.get('user_funcao', 'Integrante').lower().strip()
 
 if funcao_usuario in ["líder", "lider", "leader"]:
-    # Se for Líder, divide a tela em 4 colunas para caber o novo botão
+    # Se for Líder, divide a tela em 4 colunas para caber o novo botão no meio
     col_prog, col_repertorio, col_cifras, col_lider = st.columns(4)
 else:
     # Se for integrante comum, mantém as 3 colunas padrão
@@ -25,7 +25,7 @@ with col_prog:
         <p style="font-size: 13px; color: #e0e0e0; margin-top: 5px;">Escalas dos próximos cultos e ensaios</p>
     </div>
     """, unsafe_allow_html=True)
-    st.write("") # Espaçador
+    st.write("") 
     if st.button("Ver Próximos Cultos", use_container_width=True):
         st.switch_page("paginas/programacao.py")
 
@@ -53,7 +53,7 @@ with col_cifras:
     if st.button("Abrir Biblioteca de Cifras", use_container_width=True):
         st.switch_page("paginas/cifras.py")
 
-# CARD 4 EXCLUSIVO DO LÍDER (Só aparece para o seu usuário)
+# CARD 4 EXCLUSIVO DO LÍDER (Só aparece no meio da tela para o seu perfil)
 if col_lider is not None:
     with col_lider:
         st.markdown("""
@@ -66,7 +66,7 @@ if col_lider is not None:
         if st.button("⚙️ Painel do Líder", use_container_width=True):
             st.switch_page("paginas/lider.py")
 
-st.write("---\")
+st.write("---")
 
 # --- CONTEÚDO INFORMATIVO ---
 col_info, col_devocional = st.columns([1, 1])
@@ -86,7 +86,7 @@ with col_devocional:
     else:
         st.write("O líder ainda não gerou a palavra oficial para a próxima escala. Fique conectado!")
 
-st.write("---\")
+st.write("---")
 
 # --- BOTÃO DE SAIR (LOGOUT) ---
 st.markdown("### 🚪 Segurança")
